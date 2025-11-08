@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary: #3b82f6; /* Blue for light mode */
+    --color-secondary: #8b5cf6; /* Violet for light mode */
+
+    --color-text-base: #1f2937;
+    --color-bg-base: #f9fafb;
+    --color-bg-surface: #ffffff;
+
+    --color-logo-color: #64748b;
+  }
+
+  .dark {
+    --color-primary: #60a5fa; /* A lighter blue for dark mode for better contrast */
+    --color-secondary: #a78bfa; /* A lighter violet for dark mode */
+
+    --color-text-base: #f9fafb;
+    --color-bg-base: #111827;
+    --color-bg-surface: #1f2937;
+    --color-logo-color: #9333ea;
+  }
+
+  .typewriter-text .Typewriter__wrapper,
+.typewriter-text .Typewriter__cursor {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ql-container {
+  background: transparent;
+}
+
+.ql-editor {
+  color: #0f172a; /* slate-900-ish */
+}
+
+.dark .ql-editor {
+  color: #e2e8f0; /* slate-200-ish */
+}
+
+
+}
