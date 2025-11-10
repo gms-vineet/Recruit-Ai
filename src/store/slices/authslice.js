@@ -8,6 +8,10 @@ const initialState = {
   error: null,
   isAuthenticated: !!localStorage.getItem("token"),
  
+  me: null,
+  meLoading: false,
+  meError: null,
+  meVerified: false,
 };
 
 const authSlice = createSlice({
@@ -50,6 +54,22 @@ const authSlice = createSlice({
       state.error = action.payload;
     },
 
+     checkMeRequest: (state) => {
+      state.meLoading = true;
+      state.meError = null;
+      state.meVerified = false;
+    },
+    checkMeSuccess: (state, action) => {
+      state.meLoading = false;
+      state.me = action.payload;
+      state.meVerified = true;
+    },
+    checkMeFailure: (state, action) => {
+      state.meLoading = false;
+      state.meError = action.payload || "Verification failed";
+      state.meVerified = false;
+    },
+
     logout: (state) => {
       state.user = null;
       state.token = null;
@@ -66,6 +86,9 @@ export const {
   signupRequest,
   signupSuccess,
   signupFailure,
+   checkMeRequest,
+  checkMeSuccess,
+  checkMeFailure,
   logout,
 } = authSlice.actions;
 

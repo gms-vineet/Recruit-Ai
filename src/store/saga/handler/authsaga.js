@@ -7,6 +7,7 @@ import {
   signupRequest,
   signupSuccess,
   signupFailure,
+  checkMeRequest, checkMeSuccess, checkMeFailure,
 } from "../../slices/authslice";
 import {toast} from 'react-hot-toast'
 
@@ -49,7 +50,25 @@ function* handleSignup(action) {
   }
 }
 
+function* handleCheckMe() {
+  try {
+    const token = yield select(getToken) || localStorage.getItem("token");
+    const resp = yield call(axiosInstance.get, "/interviewer/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    yield put(checkMeSuccess(resp.data));
+    // optionally toast: toast.success("Verified interviewer");
+  } catch (error) {
+    yield put(checkMeFailure(error?.response?.data?.message || error.message));
+    toast.error("Not authorized for interviewer dashboard");
+
+    // Optional hard block: auto-logout on failed verification
+    // yield put(logout());
+  }
+}
+
 export default function* watchAuthSaga() {
   yield takeLatest(loginRequest.type, handleLogin);
   yield takeLatest(signupRequest.type, handleSignup);
+   yield takeLatest(checkMeRequest.type, handleCheckMe);
 }
