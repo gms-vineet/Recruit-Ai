@@ -10,6 +10,7 @@ import {
   checkMeRequest, checkMeSuccess, checkMeFailure,
 } from "../../slices/authslice";
 import {toast} from 'react-hot-toast'
+import { fetchCompanyRequest } from "../../slices/createCompanySlice";
 
 const getToken = (state) => state.auth.token; // ✅
 // --- LOGIN ---
@@ -23,8 +24,9 @@ function* handleLogin(action) {
     yield put(loginSuccess(response.data));
 
     toast.success('Your loged In!');
-
-
+ yield put(checkMeRequest());
+   const cid = resp.data?.interviewer?.company_id;
+    if (cid) yield put(fetchCompanyRequest(cid));
     localStorage.setItem('token', response.data.access_token);
   } catch (error) {
     toast.error('log In failed!');
@@ -53,18 +55,13 @@ function* handleSignup(action) {
 
 function* handleCheckMe() {
   try {
-    const token = yield select(getToken) || localStorage.getItem("token");
+    const token = (yield select(getToken)) || localStorage.getItem("token");
     const resp = yield call(axiosInstance.get, "/interviewer/me", {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}` },   // ✅ Bearer header
     });
     yield put(checkMeSuccess(resp.data));
-    // optionally toast: toast.success("Verified interviewer");
-  } catch (error) {
-    yield put(checkMeFailure(error?.response?.data?.message || error.message));
-    toast.error("Not authorized for interviewer dashboard");
-
-    // Optional hard block: auto-logout on failed verification
-    // yield put(logout());
+  } catch (err) {
+    yield put(checkMeFailure(err.response?.data?.message || err.message));
   }
 }
 

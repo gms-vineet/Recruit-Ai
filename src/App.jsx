@@ -11,49 +11,28 @@ import PublicRoute from "./authHandle/PublicRoute";
 import InviteReset from "./pages/InviteReset"; // ✅ new
 import AuthCallback from "./pages/AuthCallback";
 import SbSetPassword from "./pages/SbSetPassword";
+import CandidateDetail from "./pages/CandidateDetail";
 
 export default function App() {
   return (
-    <Routes>
-      {/* Landing = Login page */}
-      <Route
-        path="/"
-        element={
-          <PublicRoute>
-            <AuthForm />
-          </PublicRoute>
-        }
-      />
-
-      {/* (Optional) /auth → redirect to / */}
+      <Routes>
+      <Route path="/" element={<PublicRoute><AuthForm /></PublicRoute>} />
       <Route path="/auth" element={<Navigate to="/" replace />} />
-
-      {/* Invite/Reset page — allow even if already logged in */}
-      {/* <Route path="/invite/:token" element={<InviteReset />} /> */}
-        <Route path="/auth/callback" element={<AuthCallback />} />
-
-      {/* Password page (public) */}
+      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/set-password" element={<SbSetPassword />} />
 
-      {/* Protected (requires token) */}
-      <Route
-        element={
-          <ProtectedRoute>
-            <Layout />
-          </ProtectedRoute>
-        }
-      >
+      <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/dashboard" element={<MainContent />} />
+        <Route path="/candidate/:id" element={<CandidateDetail />} /> 
       </Route>
 
-      <Route
-        path="/get-started"
-        element={
-          <ProtectedRoute>
-            <StartingForm />
-          </ProtectedRoute>
-        }
-      />
+      {/* OPTIONAL: hard-block any accidental redirects to /get-started */}
+      <Route path="/get-started" element={<Navigate to="/dashboard" replace />} />
+
+      {/* If you still need /get-started for onboarding later, remove the line above
+          and keep it protected like this:
+          <Route path="/get-started" element={<ProtectedRoute><StartingForm /></ProtectedRoute>} />
+      */}
     </Routes>
   );
 }

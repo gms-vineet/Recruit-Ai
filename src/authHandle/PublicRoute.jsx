@@ -20,20 +20,30 @@
 // // }
 
 import React from "react";
+import { useSelector } from "react-redux";
 import { Navigate, useLocation } from "react-router-dom";
 
 const ALWAYS_PUBLIC = new Set([
-  "/",                // landing (login)
-  "/auth",            // optional alias
-  "/auth/callback",   // Supabase redirects here
-  "/set-password",    // password screen
-  "/reset",           // optional
-  "/forgot-password", // optional
+  "/auth/callback",
+  "/set-password",
+  "/reset",
+  "/forgot-password",
+  "/auth",
+  "/" // landing login page
 ]);
 
 export default function PublicRoute({ children }) {
-  const token = localStorage.getItem("token");
   const { pathname } = useLocation();
+  const { isAuthenticated, meVerified, meLoading } = useSelector(s => s.auth);
+
+  // Always let these render (Supabase flows)
   if (ALWAYS_PUBLIC.has(pathname)) return children;
-  return token ? <Navigate to="/dashboard" replace /> : children;
+
+  // If already logged in and verified → go to dashboard
+  if (isAuthenticated && !meLoading && meVerified) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Otherwise show the public page (login/signup)
+  return children;
 }

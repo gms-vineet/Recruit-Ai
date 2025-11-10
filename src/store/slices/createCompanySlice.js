@@ -22,6 +22,10 @@ const companySlice = createSlice({
       state.loading = false;
       state.error = action.payload;
     },
+      fetchCompanyRequest: (s) => { s.loading = true; s.error = null; },
+    fetchCompanySuccess: (s, { payload }) => { s.loading = false; s.company = payload; },
+    fetchCompanyFailure: (s, { payload }) => { s.loading = false; s.error = payload; },
+
     resetCompanyState: (state) => {
       state.company = null;
       state.loading = false;
@@ -34,6 +38,9 @@ export const {
   createCompanyRequest,
   createCompanySuccess,
   createCompanyFailure,
+    fetchCompanyRequest,     // <- export
+  fetchCompanySuccess,     // <- export
+  fetchCompanyFailure,     // <- export
   resetCompanyState,
 } = companySlice.actions;
 

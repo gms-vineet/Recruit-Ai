@@ -88,17 +88,17 @@ const authSlice = createSlice({
       state.loading = true;
       state.error = null;
     },
-    loginSuccess: (state, action) => {
-      state.status = true;
-      // ✅ store access_token (your API returns `access_token`)
-      state.token = action.payload.access_token || action.payload.token || null;
-      state.user = action.payload.user || null;
-      if (action.payload.access_token) {
-        localStorage.setItem("token", action.payload.access_token);
-      }
-      state.isAuthenticated = true;
-      state.loading = false;
-    },
+   loginSuccess: (state, action) => {
+  state.status = true;
+  state.user  = action.payload.user;
+  // ✅ keep the token in Redux too
+  state.token = action.payload.access_token || action.payload.token || null;
+  if (action.payload.access_token) {
+    localStorage.setItem("token", action.payload.access_token);
+  }
+  state.isAuthenticated = true;
+  state.loading = false;
+},
     loginFailure: (state, action) => {
       state.loading = false;
       state.status = false;

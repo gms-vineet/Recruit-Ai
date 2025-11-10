@@ -19,7 +19,8 @@ import {
 import { setActiveKey } from "./../store/slices/UI Slice/panelSlice";
 import { resetJobState } from "./../store/slices/createJobSlice";
 import { resetUploadJD } from "./../store/slices/uploadJdSlice";
-
+import { buildDummyCandidates } from "../utils/dummyCandidates";
+import { fmtDate, fmtTime } from "../utils/dt";
 const navItems = [
   { href: "#", label: "Dashboard", icon: RiHome4Line, active: true },
   { href: "#", label: "Settings", icon: RiSettings3Line },
@@ -35,6 +36,13 @@ export default function Sidebar({ isCollapsed, mobileOpen, onCloseMobile }) {
   const savedJobid = JSON.stringify(localStorage.getItem("jobID"));
 
   // console.log("jobListData:", jobListData);
+
+  const candidatesToday = buildDummyCandidates();
+
+const handleCandidateCardClick = (cand) => {
+  navigate(`/candidate/${cand.id}`, { state: { candidate: cand } });
+  onCloseMobile?.();
+};
 
   const dispatch = useDispatch();
 
@@ -126,7 +134,7 @@ export default function Sidebar({ isCollapsed, mobileOpen, onCloseMobile }) {
             isCollapsed ? "hidden" : "block"
           }`}
         >
-          Recruit.Ai
+          Recruit.Ai <span className="text-slate-200 "> Interviewer</span>
         </span>
         <span
           className={`font-bold text-lg text-logotextcolor ${
@@ -160,21 +168,28 @@ export default function Sidebar({ isCollapsed, mobileOpen, onCloseMobile }) {
 
         {!isCollapsed && (
           <>
-            <div
-              className={`flex items-center text-sm font-medium rounded-lg group ${
-                isCollapsed ? "justify-center" : "px-3"
-              }`}
-            >
-              <span
-                className={`text-sm font-normal ${
-                  isCollapsed ? "hidden" : "block"
-                }`}
-              >
-                Job Roles
-              </span>
-            </div>
+       <div className={`flex items-center text-sm font-medium rounded-lg group ${isCollapsed ? "justify-center" : "px-3"}`}>
+      <span className={`text-sm font-normal ${isCollapsed ? "hidden" : "block"}`}>Candidate List</span>
+    </div>
 
-            <CreateNewJobBtn clickFunc={() => handleCreateNewJobBtn()} />
+    {/* candidate cards */}
+    <div className="space-y-2 px-2">
+      {candidatesToday.map((c) => (
+        <button
+          key={c.id}
+          onClick={() => handleCandidateCardClick(c)}
+          className="w-full text-left rounded-lg border border-slate-200/30 dark:border-slate-700/50 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition cursor-pointer"
+        >
+          <div className="text-sm font-semibold truncate">{c.candidate.name}</div>
+          <div className="text-xs text-slate-500 truncate">{c.role}</div>
+          <div className="mt-1 text-[10px] text-slate-500">
+            {fmtDate(c.start)} • {fmtTime(c.start)}
+          </div>
+        </button>
+      ))}
+    </div>
+
+            {/* <CreateNewJobBtn clickFunc={() => handleCreateNewJobBtn()} /> */}
 
             {loading && (
               <div className="">

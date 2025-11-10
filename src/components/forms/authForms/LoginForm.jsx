@@ -15,25 +15,21 @@ const validationSchema = Yup.object({
 export default function LoginForm() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const meVerified = useSelector((state) => state.auth.meVerified);
-  const meLoading  = useSelector((state) => state.auth.meLoading);
-  const loading = useSelector((state) => state.auth.loading);
-  const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
+  // const meVerified = useSelector((state) => state.auth.meVerified);
+  // const meLoading  = useSelector((state) => state.auth.meLoading);
+  // const loading = useSelector((state) => state.auth.loading);
+  // const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
+   const { isAuthenticated, meVerified, meLoading, loading } = useSelector(s => s.auth);
   const [params] = useSearchParams();
   const resetDone = params.get("reset") === "done";
   const setupDone = params.get("setup") === "done";
-  // useEffect(() => {
-  //   const token = localStorage.getItem("token");
-  //   if (isAuthenticated && !loading && token) {
-  //     navigate("/get-started", { replace: true });
-  //   }
-  // }, [isAuthenticated, loading, navigate]);
-useEffect(() => {
-  const token = localStorage.getItem("token");
-  if (isAuthenticated && token && meVerified && !loading && !meLoading) {
-    navigate("/dashboard", { replace: true }); // ✅ dashboard, not get-started
-  }
-}, [isAuthenticated, meVerified, loading, meLoading, navigate]);
+ React.useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (isAuthenticated && token && meVerified && !loading && !meLoading) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isAuthenticated, meVerified, loading, meLoading, navigate]);
+
   const formik = useFormik({
     initialValues: { email: "", password: "", remember: false }, // ✅ include remember
     validationSchema,
