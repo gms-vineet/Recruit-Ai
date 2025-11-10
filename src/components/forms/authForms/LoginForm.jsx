@@ -28,13 +28,12 @@ export default function LoginForm() {
   //     navigate("/get-started", { replace: true });
   //   }
   // }, [isAuthenticated, loading, navigate]);
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (isAuthenticated && token && meVerified && !loading && !meLoading) {
-      // pick your destination
-      navigate("/dashboard", { replace: true });
-    }
-  }, [isAuthenticated, meVerified, loading, meLoading, navigate]);
+useEffect(() => {
+  const token = localStorage.getItem("token");
+  if (isAuthenticated && token && meVerified && !loading && !meLoading) {
+    navigate("/dashboard", { replace: true }); // ✅ dashboard, not get-started
+  }
+}, [isAuthenticated, meVerified, loading, meLoading, navigate]);
   const formik = useFormik({
     initialValues: { email: "", password: "", remember: false }, // ✅ include remember
     validationSchema,
