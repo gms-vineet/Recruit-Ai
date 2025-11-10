@@ -9,6 +9,8 @@ import AuthForm from "./pages/AuthForm";
 import ProtectedRoute from "./authHandle/ProtectedRoute";
 import PublicRoute from "./authHandle/PublicRoute";
 import InviteReset from "./pages/InviteReset"; // ✅ new
+import AuthCallback from "./pages/AuthCallback";
+import SbSetPassword from "./pages/SbSetPassword";
 
 export default function App() {
   return (
@@ -27,7 +29,11 @@ export default function App() {
       <Route path="/auth" element={<Navigate to="/" replace />} />
 
       {/* Invite/Reset page — allow even if already logged in */}
-      <Route path="/invite/:token" element={<InviteReset />} />
+      {/* <Route path="/invite/:token" element={<InviteReset />} /> */}
+        <Route path="/auth/callback" element={<AuthCallback />} />
+
+      {/* Password page (public) */}
+      <Route path="/set-password" element={<SbSetPassword />} />
 
       {/* Protected (requires token) */}
       <Route

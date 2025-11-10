@@ -17,9 +17,9 @@ export default function LoginForm() {
   const dispatch = useDispatch();
   const loading = useSelector((state) => state.auth.loading);
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
-    const [params] = useSearchParams();
+  const [params] = useSearchParams();
   const resetDone = params.get("reset") === "done";
-
+  const setupDone = params.get("setup") === "done";
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (isAuthenticated && !loading && token) {
@@ -45,9 +45,15 @@ export default function LoginForm() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen text-white p-4 sm:p-8 w-full">
       <div className="relative z-10 w-full max-w-md">
-        {resetDone && (
-          <div className="mb-4 rounded-md border border-green-500/40 bg-green-500/10 text-green-300 px-4 py-3 text-sm">
-            Password updated. Please sign in.
+        {(resetDone || setupDone) && (
+          <div
+            className={`mb-4 rounded-md border px-4 py-3 text-sm ${
+              setupDone
+                ? "border-blue-500/40 bg-blue-500/10 text-blue-300"
+                : "border-green-500/40 bg-green-500/10 text-green-300"
+            }`}
+          >
+            {setupDone ? "Password set. Please sign in." : "Password updated. Please sign in."}
           </div>
         )}
         <div className="text-center mb-10">
