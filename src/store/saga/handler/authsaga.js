@@ -1,4 +1,4 @@
-import { call, put, takeLatest } from "redux-saga/effects";
+import { call, put, select, takeLatest } from "redux-saga/effects";
 import axiosInstance from "./../axiosInstance/axiosInstance";
 import {
   loginRequest,
@@ -11,6 +11,7 @@ import {
 } from "../../slices/authslice";
 import {toast} from 'react-hot-toast'
 
+const getToken = (state) => state.auth.token; // ✅
 // --- LOGIN ---
 function* handleLogin(action) {
   try {

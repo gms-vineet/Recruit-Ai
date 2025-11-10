@@ -32,7 +32,7 @@ export default function LoginForm() {
     const token = localStorage.getItem("token");
     if (isAuthenticated && token && meVerified && !loading && !meLoading) {
       // pick your destination
-      navigate("/get-started", { replace: true });
+      navigate("/dashboard", { replace: true });
     }
   }, [isAuthenticated, meVerified, loading, meLoading, navigate]);
   const formik = useFormik({
