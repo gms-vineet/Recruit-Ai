@@ -44,3 +44,46 @@
 
 
 }
+/* Themed scrollbars (works with Tailwind dark mode = 'class') */
+.ra-scroll {
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: var(--sb-thumb) var(--sb-track);
+}
+
+/* Light theme (default) */
+:root {
+  --sb-track: #f1f5f9;         /* slate-100 */
+  --sb-thumb: #cbd5e1;         /* slate-300 */
+  --sb-thumb-hover: #94a3b8;   /* slate-400 */
+  --sb-corner: transparent;
+}
+
+/* Dark theme */
+.dark {
+  --sb-track: #0f172a;         /* slate-900 */
+  --sb-thumb: #334155;         /* slate-700 */
+  --sb-thumb-hover: #475569;   /* slate-600 */
+  --sb-corner: transparent;
+}
+
+/* WebKit (Chrome/Edge/Safari) */
+.ra-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.ra-scroll::-webkit-scrollbar-track {
+  background: var(--sb-track);
+  border-radius: 9999px;
+}
+.ra-scroll::-webkit-scrollbar-thumb {
+  background: var(--sb-thumb);
+  border-radius: 9999px;
+  border: 2px solid var(--sb-track); /* creates a gap effect */
+}
+.ra-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--sb-thumb-hover);
+}
+.ra-scroll::-webkit-scrollbar-corner {
+  background: var(--sb-corner);
+}

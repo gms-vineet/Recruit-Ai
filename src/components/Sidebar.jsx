@@ -38,7 +38,12 @@ export default function Sidebar({ isCollapsed, mobileOpen, onCloseMobile }) {
   // console.log("jobListData:", jobListData);
 
   const candidatesToday = buildDummyCandidates();
-
+const getName = (c) =>
+   c?.full_name ||
+   c?.candidate?.name ||
+   [c?.first_name, c?.last_name].filter(Boolean).join(" ") ||
+   c?.email ||
+   "—";
 const handleCandidateCardClick = (cand) => {
   navigate(`/candidate/${cand.id}`, { state: { candidate: cand } });
   onCloseMobile?.();
@@ -180,7 +185,7 @@ const handleCandidateCardClick = (cand) => {
           onClick={() => handleCandidateCardClick(c)}
           className="w-full text-left rounded-lg border border-slate-200/30 dark:border-slate-700/50 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition cursor-pointer"
         >
-          <div className="text-sm font-semibold truncate">{c.candidate.name}</div>
+          <div className="text-sm font-semibold truncate">{getName(c)}</div>
           <div className="text-xs text-slate-500 truncate">{c.role}</div>
           <div className="mt-1 text-[10px] text-slate-500">
             {fmtDate(c.start)} • {fmtTime(c.start)}

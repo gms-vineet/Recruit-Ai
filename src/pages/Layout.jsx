@@ -43,7 +43,7 @@ export default function Layout() {
           />
 
           {/* Scroll container moved to main only, and only engages when overflow exists */}
-          <main className="flex-1 bg-transparent p-4 sm:p-6 overflow-y-auto">
+          <main className="flex-1 bg-transparent ra-scroll p-4 sm:p-6 overflow-y-auto">
             <Outlet />
           </main>
         </div>

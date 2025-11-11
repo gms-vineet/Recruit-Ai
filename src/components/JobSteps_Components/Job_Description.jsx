@@ -39,6 +39,12 @@ function buildDummyInterviews() {
   ];
 }
 
+const getName = (c) =>
+  c?.full_name ||
+  c?.candidate?.name ||
+  [c?.first_name, c?.last_name].filter(Boolean).join(" ") ||
+  c?.email ||
+  "—";
 export default function Job_Description() {
   const dispatch = useDispatch();
 
@@ -78,10 +84,10 @@ const openCandidate = (cand) => {
     onClick={() => openCandidate(it)}
     className="rounded-xl border border-slate-200/20 bg-white/70 dark:bg-slate-900/60 backdrop-blur shadow p-4 hover:shadow-md transition-shadow cursor-pointer"
     role="button"
-    aria-label={`Open ${it.candidate.name}`}
+    aria-label={`Open ${getName(it)}`}
   >
     <div className="flex items-center justify-between">
-      <div className="font-semibold truncate">{it.candidate.name}</div>
+      <div className="font-semibold truncate">{getName(it)}</div>
       <span className="px-2.5 py-1 text-[10px] rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
         {it.status}
       </span>

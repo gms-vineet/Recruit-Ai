@@ -12,6 +12,7 @@ import InviteReset from "./pages/InviteReset"; // ✅ new
 import AuthCallback from "./pages/AuthCallback";
 import SbSetPassword from "./pages/SbSetPassword";
 import CandidateDetail from "./pages/CandidateDetail";
+import InterviewRoom from "./pages/InterviewRoom";
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/dashboard" element={<MainContent />} />
         <Route path="/candidate/:id" element={<CandidateDetail />} /> 
+          <Route path="/interview-room" element={<InterviewRoom />} />
       </Route>
 
       {/* OPTIONAL: hard-block any accidental redirects to /get-started */}
