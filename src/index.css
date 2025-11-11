@@ -87,3 +87,14 @@
 .ra-scroll::-webkit-scrollbar-corner {
   background: var(--sb-corner);
 }
+/* icon buttons + toggle states */
+.ir-btn.icon{display:flex;align-items:center;gap:8px}
+.ir-btn.danger{background:#7f1d1d}
+.ir-btn .caret{display:inline-flex;margin-left:6px}
+.ir-icon{display:inline-flex;line-height:0}
+.ir-icon.mic{color:#ef4444}
+.ir-icon.monitor{color:#22c55e}
+
+/* visual “on” state */
+.ir-btn[data-active="1"]{outline:1px solid #22c55e;background:#102a19}
+.ir-btn.micbtn[data-active="1"]{outline-color:#ef4444;background:#2a0f14}

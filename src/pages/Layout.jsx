@@ -1,19 +1,29 @@
-// src/layouts/Layout.tsx (updated)
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "./../components/Sidebar";
 import Topbar from "./../components/Topbar";
-import { Outlet } from "react-router-dom";
 
 export default function Layout() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const { pathname } = useLocation();
+
+  const onInterviewRoom = pathname.startsWith("/interview-room");
+
+  useEffect(() => {
+    if (onInterviewRoom) {
+      // collapse the desktop rail; drawer will still be available
+      setIsCollapsed(true);
+      setMobileSidebarOpen(false);
+    }
+  }, [onInterviewRoom]);
 
   const openMobileSidebar = () => setMobileSidebarOpen(true);
   const closeMobileSidebar = () => setMobileSidebarOpen(false);
 
   return (
     <div className="h-screen w-full relative overflow-hidden bg-white text-slate-800 dark:bg-black dark:text-slate-200">
-      {/* Background */}
+      {/* background */}
       <div
         className="absolute inset-0 z-0 [--base:#ffffff] dark:[--base:#000000]"
         style={{
@@ -27,23 +37,26 @@ export default function Layout() {
         }}
       />
 
-      {/* Content */}
+      {/* content */}
       <div className="relative z-10 flex h-screen">
-        <Sidebar
-          isCollapsed={isCollapsed}
-          mobileOpen={mobileSidebarOpen}
-          onCloseMobile={closeMobileSidebar}
-        />
+        {/* ✅ Always mount Sidebar. Hide only desktop rail in interview room. */}
+       <Sidebar
+   isCollapsed={isCollapsed}
+   mobileOpen={mobileSidebarOpen}
+   onCloseMobile={closeMobileSidebar}
+ />
 
-        {/* No overflow here; the main element will own scrolling when needed */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
           <Topbar
             toggleCollapse={() => setIsCollapsed((v) => !v)}
             openMobileSidebar={openMobileSidebar}
           />
 
-          {/* Scroll container moved to main only, and only engages when overflow exists */}
-          <main className="flex-1 bg-transparent ra-scroll p-4 sm:p-6 overflow-y-auto">
+          <main
+            className={`flex-1 bg-transparent ra-scroll overflow-y-auto ${
+              onInterviewRoom ? "p-2 sm:p-3" : "p-4 sm:p-6"
+            }`}
+          >
             <Outlet />
           </main>
         </div>

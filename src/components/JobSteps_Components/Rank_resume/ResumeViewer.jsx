@@ -160,24 +160,23 @@ export default function ResumeViewer({ data }) {
               </div>
             )}
 
-            <button
-              type="button"
-              onClick={() => {
-                // pass minimal prefill; add more (jd/resume) if you have them in 'selected'
-               navigate("/interview-room", {
-  state: {
-    sessionId: `MEET-${Math.random().toString(36).slice(2, 9)}`,
-    interviewer: "Interviewer",
-    candidate: getName(selected),
-    promptMic: true,          // <<< ask for mic permission on arrival
-  },
-});
-                
-              }}
-              className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white shadow hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
-            >
-              Interview Room
-            </button>
+           <button
+  type="button"
+  onClick={() => {
+    // Navigate and request mic permission popup on arrival
+    navigate("/interview-room", {
+      state: {
+        sessionId: `MEET-${Math.random().toString(36).slice(2, 9)}`,
+        interviewer: "Interviewer",
+        candidate: getName(selected),
+        promptMic: true,   // <-- causes InterviewRoom to call getUserMedia immediately
+      },
+    });
+  }}
+  className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white shadow hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
+>
+  Interview Room
+</button>
           </div>
         </div>
 
