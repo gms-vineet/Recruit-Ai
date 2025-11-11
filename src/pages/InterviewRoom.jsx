@@ -383,55 +383,71 @@ export default function InterviewRoom() {
     }
 
     // ===== TAB =====
-    async function startTab() {
-      if (wsTab && wsTab.readyState === WebSocket.OPEN) {
-        setStatus("tab already running");
-        return;
+ async function startTab() {
+  if (wsTab && wsTab.readyState === WebSocket.OPEN) {
+    setStatus("tab already running");
+    return;
+  }
+
+  setStatus("opening tab picker…");
+
+  // 1) Open the browser's picker FIRST to keep the user gesture
+  let pickedStream;
+  try {
+    pickedStream = await navigator.mediaDevices.getDisplayMedia({
+      // Hints for Chromium; other browsers ignore unknown keys harmlessly
+      video: { displaySurface: "browser", preferCurrentTab: true },
+      audio: {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+        // Chromium tab-capture hint to avoid local feedback (best-effort)
+        suppressLocalAudioPlayback: true
       }
-      const sessionId = await ensureSession();
-      const candidate = candidateEl.value.trim() || "Candidate";
+    });
+  } catch (e) {
+    setStatus(e?.name === "NotAllowedError" ? "tab share cancelled" : "tab share failed");
+    return;
+  }
 
-      if (!acTab)
-        acTab = new (window.AudioContext || window.webkitAudioContext)({
-          sampleRate: 48000,
-        });
-      if (!tabModuleLoaded) {
-        await acTab.audioWorklet.addModule("/static/mic-worklet.js");
-        tabModuleLoaded = true;
-      }
+  // 2) Spin up audio pipeline
+  if (!acTab)
+    acTab = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+  if (!tabModuleLoaded) {
+    await acTab.audioWorklet.addModule("/static/mic-worklet.js");
+    tabModuleLoaded = true;
+  }
 
-      // Select Meet tab and tick “Share tab audio”
-      try {
-        streamTab = await navigator.mediaDevices.getDisplayMedia({
-          video: true,
-          audio: true,
-        });
-      } catch (e) {
-        setStatus(e?.name === "NotAllowedError" ? "tab share cancelled" : "tab share failed");
-        return;
-      }
+  streamTab = pickedStream;
 
-      try {
-        streamTab.getTracks().forEach((t) => t.addEventListener("ended", () => stopTab()));
-      } catch {}
+  // Let user know if they forgot to tick "Share tab audio"
+  if (!streamTab.getAudioTracks().length) {
+    setStatus("tab selected without audio — enable “Share tab audio” in the picker");
+  }
 
-      const src = acTab.createMediaStreamSource(streamTab);
+  try {
+    streamTab.getTracks().forEach(t => t.addEventListener("ended", () => stopTab()));
+  } catch {}
 
-      const node = new AudioWorkletNode(acTab, "mic-processor");
-      node.port.onmessage = (ev) => {
-        const frame = ev.data;
-        if (rms(frame) < VAD_THRESH) return; // noise gate for tab
-        const i16 = downsampleFloat32ToInt16(frame, acTab.sampleRate, 16000);
-        bufTab.push(i16);
-        lenTab += i16.length;
-      };
-      src.connect(node);
-      nodeTab = node;
+  const src = acTab.createMediaStreamSource(streamTab);
+  const node = new AudioWorkletNode(acTab, "mic-processor");
+  node.port.onmessage = (ev) => {
+    const frame = ev.data;
+    if (rms(frame) < VAD_THRESH) return;      // small noise gate
+    const i16 = downsampleFloat32ToInt16(frame, acTab.sampleRate, 16000);
+    bufTab.push(i16);
+    lenTab += i16.length;
+  };
+  src.connect(node);
+  nodeTab = node;
 
-      wsTab = openWS("tab", sessionId, "candidate", candidate);
-      startSender("tab");
-      setStatus("recording (tab)…");
-    }
+  // 3) Now do slower work (session + websocket)
+  const sessionId = (await ensureSession().catch(() => null)) || sessionEl.value.trim();
+  const candidate = candidateEl.value.trim() || "Candidate";
+  wsTab = openWS("tab", sessionId, "candidate", candidate);
+  startSender("tab");
+  setStatus("recording (tab)…");
+}
 
     function stopTab() {
       if (sendTimerTab) {
