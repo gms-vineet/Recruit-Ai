@@ -63,7 +63,7 @@ export default function InterviewRoom() {
     // HTTP base (env or default to Render)
     const BACKEND_HTTP =
       (import.meta?.env?.VITE_BACKEND_HTTP?.replace(/\/$/, "")) ||
-      "https://recruit-meet-ai-2.onrender.com";
+      "https://recruit-meet-ai-4.onrender.com";
 
     // WS base derived from HTTP
     const httpURL = new URL(BACKEND_HTTP);
