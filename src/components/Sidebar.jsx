@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { NavLink } from "react-router-dom";
 import {
   RiHome4Line,
   RiSettings3Line,
@@ -21,10 +22,14 @@ import { resetJobState } from "./../store/slices/createJobSlice";
 import { resetUploadJD } from "./../store/slices/uploadJdSlice";
 import { buildDummyCandidates } from "../utils/dummyCandidates";
 import { fmtDate, fmtTime } from "../utils/dt";
-const navItems = [
-  { href: "#", label: "Dashboard", icon: RiHome4Line, active: true },
-  { href: "#", label: "Settings", icon: RiSettings3Line },
-];
+// const navItems = [
+//   { href: "#", label: "Dashboard", icon: RiHome4Line, active: true },
+//   { href: "#", label: "Settings", icon: RiSettings3Line },
+// ];
+ const navItems = [
+   { to: "/dashboard", label: "Dashboard", icon: RiHome4Line },
+   // { to: "/settings", label: "Settings", icon: RiSettings3Line },
+ ];
 
 export default function Sidebar({ isCollapsed, mobileOpen, onCloseMobile }) {
   const navigate = useNavigate();
@@ -48,7 +53,9 @@ const handleCandidateCardClick = (cand) => {
   navigate(`/candidate/${cand.id}`, { state: { candidate: cand } });
   onCloseMobile?.();
 };
-
+const currentCandidateId = location.pathname.startsWith("/candidate/")
+   ? location.pathname.split("/").pop()
+   : null;
   const dispatch = useDispatch();
 
   useEffect(() => {
@@ -152,24 +159,27 @@ const handleCandidateCardClick = (cand) => {
 
       {/* Nav */}
       <nav className="flex-1 px-2 py-4 space-y-2 overflow-y-auto">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <a
-              key={item.label}
-              href={item.href}
-              className={`flex items-center p-3 text-sm font-medium rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 group
-                          ${isCollapsed ? "justify-center" : "px-4"}
-                          ${item.active ? "bg-slate-200 dark:bg-slate-700" : ""}
-                          last:border-b-2 last:border-slate-400 dark:last:border-slate-600`}
-            >
-              <Icon className="w-4 h-4 shrink-0 text-slate-500 group-hover:text-slate-700 dark:text-slate-400 dark:group-hover:text-slate-200" />
-              <span className={`ml-3 ${isCollapsed ? "hidden" : "block"}`}>
-                {item.label}
-              </span>
-            </a>
-          );
-        })}
+         {navItems.map((item) => {
+   const Icon = item.icon;
+   return (
+     <NavLink
+       key={item.label}
+       to={item.to}
+       end
+       className={({ isActive }) =>
+         `flex items-center p-3 text-sm font-medium rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 group
+          ${isCollapsed ? "justify-center" : "px-4"}
+          ${isActive ? "bg-slate-200 dark:bg-slate-700" : ""}
+          last:border-b-2 last:border-slate-400 dark:last:border-slate-600`
+       }
+     >
+       <Icon className="w-4 h-4 shrink-0 text-slate-500 group-hover:text-slate-700 dark:text-slate-400 dark:group-hover:text-slate-200" />
+       <span className={`ml-3 ${isCollapsed ? "hidden" : "block"}`}>
+         {item.label}
+       </span>
+     </NavLink>
+   );
+ })}
 
         {!isCollapsed && (
           <>
@@ -183,8 +193,10 @@ const handleCandidateCardClick = (cand) => {
         <button
           key={c.id}
           onClick={() => handleCandidateCardClick(c)}
-          className="w-full text-left rounded-lg border border-slate-200/30 dark:border-slate-700/50 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition cursor-pointer"
-        >
+          // className="w-full text-left rounded-lg border border-slate-200/30 dark:border-slate-700/50 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition cursor-pointer"
+       className={`w-full text-left rounded-lg border border-slate-200/30 dark:border-slate-700/50 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition cursor-pointer
++   ${String(currentCandidateId) === String(c.id) ? "bg-slate-200/60 dark:bg-slate-700/60 ring-1 ring-slate-300 dark:ring-slate-600" : ""}`}
+       >
           <div className="text-sm font-semibold truncate">{getName(c)}</div>
           <div className="text-xs text-slate-500 truncate">{c.role}</div>
           <div className="mt-1 text-[10px] text-slate-500">
@@ -291,20 +303,19 @@ const handleCandidateCardClick = (cand) => {
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
-              <a
-                key={item.label}
-                href={item.href}
-                onClick={onCloseMobile}
-                className={`flex items-center p-3 text-sm font-medium rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 group
-                            ${
-                              item.active
-                                ? "bg-slate-200 dark:bg-slate-700"
-                                : ""
-                            }`}
-              >
-                <Icon className="w-4 h-4 shrink-0 text-slate-500 group-hover:text-slate-700 dark:text-slate-400 dark:group-hover:text-slate-200" />
-                <span className="ml-3">{item.label}</span>
-              </a>
+              <NavLink
+   key={item.label}
+   to={item.to}
+   end
+   onClick={onCloseMobile}
+   className={({ isActive }) =>
+     `flex items-center p-3 text-sm font-medium rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 group
+      ${isActive ? "bg-slate-200 dark:bg-slate-700" : ""}`
+   }
+ >
+   <Icon className="w-4 h-4 shrink-0 text-slate-500 group-hover:text-slate-700 dark:text-slate-400 dark:group-hover:text-slate-200" />
+   <span className="ml-3">{item.label}</span>
+ </NavLink>
             );
           })}
 

@@ -1,38 +1,26 @@
+// src/pages/InterviewRoom.jsx
 import React, { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
+import mediaBus, { stopPiP } from "@/lib/mediaBus";
 
 const styles = `
 :root { --bg:#0b0f14; --fg:#e6edf3; --muted:#9aa3ac; --chip:#1f2937; }
-body.interview-room-body { background:var(--bg); } /* scoped body class */
+body.interview-room-body { background:var(--bg); }
 .ir-wrap { color:var(--fg); font:15px/1.45 system-ui, sans-serif; }
 .ir-header { padding:16px 20px; border-bottom:1px solid #111827; display:flex; gap:12px; align-items:center; }
-.ir-main {
-   width:100%;
-   max-width:none;                 /* fill all space left by the layout */
-   margin:18px 0;                  /* no centering cap */
-   padding:0 16px 80px;
- }
+.ir-main { width:100%; max-width:none; margin:18px 0; padding:0 16px 80px; }
 .ir-row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
-
 .ir-btn { padding:10px 14px; border-radius:10px; background:#2563eb; color:white; border:none; cursor:pointer; }
-.ir-btn.secondary { background:#374151; }
-.ir-btn.danger { background:#7f1d1d; }
-
-/* icon buttons + toggle states */
+.ir-btn.secondary { background:#374151; } .ir-btn.danger { background:#7f1d1d; }
 .ir-btn.icon{display:flex;align-items:center;gap:8px; position:relative; }
 .ir-btn .caret{display:inline-flex;margin-left:6px}
 .ir-icon{display:inline-flex;line-height:0}
-.ir-icon.mic{color:#ef4444}
-.ir-icon.monitor{color:#22c55e}
-/* active visuals */
+.ir-icon.mic{color:#ef4444} .ir-icon.monitor{color:#22c55e}
 .ir-btn[data-active="1"]{outline:1px solid #22c55e;background:#102a19}
 .ir-btn.micbtn[data-active="1"]{outline-color:#ef4444;background:#2a0f14}
-
-/* small split so the caret can open menu without toggling mic */
 .ir-btn .split { display:inline-flex; align-items:center; gap:6px; }
 .ir-btn .split .body { display:inline-flex; align-items:center; gap:8px; }
 .ir-btn .split .caret { padding-left:6px; border-left:1px solid rgba(255,255,255,.15); margin-left:6px; }
-
 .ir-pill { background:var(--chip); color:var(--muted); border-radius:999px; padding:6px 10px; }
 .ir-panel { background:#0f172a; border:1px solid #1f2937; border-radius:14px; padding:14px; }
 .ir-interim { color:#cbd5e1; font-style:italic; opacity:.9; min-height:22px; }
@@ -41,51 +29,21 @@ body.interview-room-body { background:var(--bg); } /* scoped body class */
 .ir-who { color:#93c5fd; margin-right:8px; font-weight:600; }
 .ir-sendbtn { background:#1f2937; border:1px solid #334155; color:#d1d5db; border-radius:8px; padding:6px 10px; cursor:pointer; display:flex; align-items:center; gap:6px; }
 .ir-sendbtn:hover { background:#2a3648; }
-
-.ir-grid {
-   display:grid;
-   grid-template-columns: repeat(3, 1fr);  /* 33.33% each */
-   gap:16px;
- }
-  @media (max-width: 1280px) {
-  .ir-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
-}
-@media (max-width: 860px) {
-  .ir-grid { grid-template-columns: 1fr; }
-}
+.ir-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:16px; }
+@media (max-width:1280px){ .ir-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width:860px) { .ir-grid { grid-template-columns: 1fr; } }
 .ir-stack { display:flex; flex-direction:column; gap:8px; }
-.ir-pre { white-space:pre-wrap; }
-.ir-tiny { font-size:12px; color:var(--muted); }
+.ir-pre { white-space:pre-wrap; } .ir-tiny { font-size:12px; color:var(--muted); }
 .ir-badge { padding:2px 6px; border-radius:6px; font-size:12px; }
-.ir-ok { background:#064e3b; color:#a7f3d0; }
-.ir-warn { background:#4f46e5; color:#e0e7ff; }
-.ir-bad { background:#7f1d1d; color:#fecaca; }
+.ir-ok { background:#064e3b; color:#a7f3d0; } .ir-warn { background:#4f46e5; color:#e0e7ff; } .ir-bad { background:#7f1d1d; color:#fecaca; }
 .ir-rightbox { display:flex; flex-direction:column; gap:10px; position:relative; }
 .ir-summary-wrap { margin-top:auto; }
-
-/* ---------- dropdown menu ---------- */
-.ir-menu {
-  position:absolute;
-  top:100%; left:0;
-  margin-top:8px;
-  min-width:280px;
-  background:#0b1220;
-  border:1px solid #1f2937;
-  border-radius:12px;
-  padding:8px;
-  box-shadow:0 10px 30px rgba(0,0,0,0.35);
-  z-index:1000;
-  display:none;
-}
-.ir-menu[data-open="1"]{ display:block; }
-.ir-menu h4 { margin:4px 6px 8px; font-size:12px; color:#9aa3ac; font-weight:600; letter-spacing:.04em; }
-.ir-menu .item {
-  width:100%; text-align:left; background:#0f172a; border:1px solid #1f2937;
-  color:#cbd5e1; padding:8px 10px; border-radius:10px; cursor:pointer; margin:4px 0;
-}
-.ir-menu .item:hover { background:#142036; }
-.ir-menu .item[data-active="1"] { outline:1px solid #2563eb; background:#13233f; }
-.ir-menu .line { height:1px; background:#1f2937; margin:8px 2px; }
+/* dropdown */
+.ir-menu{position:absolute;top:100%;left:0;margin-top:8px;min-width:280px;background:#0b1220;border:1px solid #1f2937;border-radius:12px;padding:8px;box-shadow:0 10px 30px rgba(0,0,0,0.35);z-index:1000;display:none;}
+.ir-menu[data-open="1"]{display:block;}
+.ir-menu h4{margin:4px 6px 8px;font-size:12px;color:#9aa3ac;font-weight:600;letter-spacing:.04em;}
+.ir-menu .item{width:100%;text-align:left;background:#0f172a;border:1px solid #1f2937;color:#cbd5e1;padding:8px 10px;border-radius:10px;cursor:pointer;margin:4px 0;}
+.ir-menu .item:hover{background:#142036;} .ir-menu .item[data-active="1"]{outline:1px solid #2563eb;background:#13233f;} .ir-menu .line{height:1px;background:#1f2937;margin:8px 2px;}
 `;
 
 export default function InterviewRoom() {
@@ -94,24 +52,28 @@ export default function InterviewRoom() {
     sessionId: state?.sessionId || "",
     interviewer: state?.interviewer || "",
     candidate: state?.candidate || "",
-    jd: "",
-    resume: ""
+    jd: state?.jd || "",
+    resume: state?.resume || "",
+    meetUrl: state?.meetUrl || "",
   });
 
   useEffect(() => {
     document.body.classList.add("interview-room-body");
 
-    const BACKEND_HTTP = window.location.origin;
+    // HTTP base (env or default to Render)
+    const BACKEND_HTTP =
+      (import.meta?.env?.VITE_BACKEND_HTTP?.replace(/\/$/, "")) ||
+      "https://recruit-meet-ai-2.onrender.com";
+
+    // WS base derived from HTTP
+    const httpURL = new URL(BACKEND_HTTP);
     const BACKEND_WS =
-      (window.location.protocol === "https:" ? "wss://" : "ws://") +
-      window.location.host;
+      (httpURL.protocol === "https:" ? "wss://" : "ws://") + httpURL.host;
 
     // ===== Device/UI state =====
     let selectedMicId = null;
     let selectedMicLabel = "System Default";
     let audioInputs = [];
-
-    // single source of truth for mic state
     let micOn = false;
 
     // Optional: Meet mute sync via BroadcastChannel
@@ -131,7 +93,7 @@ export default function InterviewRoom() {
       return Math.sqrt(s / frame.length);
     }
 
-    // 48k Float32 -> 16k Int16 LINEAR16
+    // 48k Float32 -> 16k Int16
     function downsampleFloat32ToInt16(float32, inRate, outRate = 16000) {
       const ratio = inRate / outRate;
       const newLen = Math.floor(float32.length / ratio);
@@ -147,13 +109,12 @@ export default function InterviewRoom() {
       return out;
     }
 
-    // keep-alive to avoid STT timeout on silence
     const CHUNK_MS = 100;
     const SILENCE_100MS = new Uint8Array(
       new Int16Array((16000 * CHUNK_MS) / 1000).buffer
     );
 
-    // split state for mic and tab
+    // audio contexts
     let acMic, acTab;
     let micModuleLoaded = false;
     let tabModuleLoaded = false;
@@ -169,7 +130,6 @@ export default function InterviewRoom() {
     let streamTab = null;
 
     const $ = (id) => document.getElementById(id);
-
     const statusEl = $("status");
     const interimEl = $("interim");
     const finalsEl = $("finals");
@@ -181,49 +141,33 @@ export default function InterviewRoom() {
     const vExplain = $("v_explain");
     const vCand = $("v_cand");
 
-    const suggUL = $("suggestions");
-    const aiOut = $("aiOut");
-
     const micBtn = $("startMic");
     const tabBtn = $("startTab");
     const stopBtn = $("stop");
     const micMenu = $("micMenu");
     const micLabelEl = $("micLabel");
 
-    const setStatus = (t) => (statusEl.textContent = t);
+    const setStatus = (t) => { if (statusEl) statusEl.textContent = t; };
 
-    // ===== Permissions / enumerate devices =====
     async function enumerateAudioInputs() {
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         audioInputs = devices
           .filter((d) => d.kind === "audioinput")
-          .map((d) => ({
-            deviceId: d.deviceId,
-            label: d.label || "Microphone",
-            kind: d.kind
-          }));
+          .map((d) => ({ deviceId: d.deviceId, label: d.label || "Microphone", kind: d.kind }));
         renderMicMenu();
       } catch {}
     }
 
     async function prewarmMicPermission(forceRealPrompt = false) {
       const shouldPromptNow = !!forceRealPrompt || state?.promptMic === true;
-
       if (!("mediaDevices" in navigator) || !navigator.mediaDevices.getUserMedia) {
-        setStatus("mic permission: unsupported");
-        return;
+        setStatus("mic permission: unsupported"); return;
       }
-      if (
-        location.protocol !== "https:" &&
-        location.hostname !== "localhost" &&
-        location.hostname !== "127.0.0.1"
-      ) {
+      if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
         setStatus("use HTTPS or localhost for mic");
       }
-
       try {
-        // Show the browser permission prompt immediately when asked
         if (shouldPromptNow) {
           const tmp = await navigator.mediaDevices.getUserMedia({ audio: true });
           tmp.getTracks().forEach((t) => t.stop());
@@ -243,25 +187,36 @@ export default function InterviewRoom() {
       navigator.mediaDevices?.addEventListener?.("devicechange", enumerateAudioInputs);
     } catch {}
 
-    // ===== Session bootstrap =====
     async function ensureSession() {
       if (!metaRef.current.sessionId) {
         metaRef.current.sessionId = `MEET-${Math.random().toString(36).slice(2, 9)}`;
       }
       try {
+        const body = {
+          meeting_id: metaRef.current.sessionId,
+          interviewer_name: metaRef.current.interviewer || "",
+          candidate_name: metaRef.current.candidate || "",
+          jd: metaRef.current.jd || "",
+          resume: metaRef.current.resume || "",
+          meet_url: metaRef.current.meetUrl || "",
+        };
+
         const r = await fetch(`${BACKEND_HTTP}/session/start`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ meeting_id: metaRef.current.sessionId })
+          body: JSON.stringify(body)
         });
+
         if (r.ok) {
           let data = null;
           try { data = await r.json(); } catch {}
           if (data) {
-            metaRef.current.interviewer = data.interviewer_name || metaRef.current.interviewer || "";
-            metaRef.current.candidate   = data.candidate_name   || metaRef.current.candidate   || "";
-            metaRef.current.jd          = data.jd || metaRef.current.jd || "";
-            metaRef.current.resume      = data.resume || metaRef.current.resume || "";
+            // Allow backend to echo/override fields
+            metaRef.current.interviewer = data.interviewer_name ?? metaRef.current.interviewer;
+            metaRef.current.candidate   = data.candidate_name   ?? metaRef.current.candidate;
+            metaRef.current.jd          = data.jd               ?? metaRef.current.jd;
+            metaRef.current.resume      = data.resume           ?? metaRef.current.resume;
+            metaRef.current.meetUrl     = data.meet_url         ?? metaRef.current.meetUrl;
           }
           setStatus(`session ${metaRef.current.sessionId} ready`);
         } else {
@@ -273,11 +228,9 @@ export default function InterviewRoom() {
       return metaRef.current.sessionId;
     }
 
-    // ===== Transcript helpers =====
     function addSendButton(div, who, text) {
       const interviewerName = metaRef.current.interviewer?.trim() || "Interviewer";
       if (who !== interviewerName) return;
-
       const btn = document.createElement("button");
       btn.className = "ir-sendbtn";
       btn.title = "Send question to AI";
@@ -291,13 +244,10 @@ export default function InterviewRoom() {
         vCand.textContent = "";
         try {
           const data = await postJSON(`${BACKEND_HTTP}/ai/expected`, {
-            session_id: metaRef.current.sessionId,
-            question: text,
+            session_id: metaRef.current.sessionId, question: text,
           });
           vE.textContent = data.expected_answer || "";
-        } catch (e) {
-          vE.textContent = "Error: " + e.message;
-        }
+        } catch (e) { vE.textContent = "Error: " + e.message; }
       });
       div.appendChild(btn);
     }
@@ -318,11 +268,7 @@ export default function InterviewRoom() {
     }
 
     function openWS(source, sessionId, speaker, speakerName) {
-      const qs = `session_id=${encodeURIComponent(
-        sessionId
-      )}&speaker=${encodeURIComponent(
-        speaker
-      )}&speaker_name=${encodeURIComponent(speakerName)}`;
+      const qs = `session_id=${encodeURIComponent(sessionId)}&speaker=${encodeURIComponent(speaker)}&speaker_name=${encodeURIComponent(speakerName)}`;
       const wss = new WebSocket(`${BACKEND_WS}/ws/${source}?${qs}`);
       wss.binaryType = "arraybuffer";
       wss.onopen = () => {
@@ -381,16 +327,16 @@ export default function InterviewRoom() {
       }
     }
 
-    // ===== UI helpers for toggle buttons =====
     function setMicUI(on){
+      const micBtn = document.getElementById("startMic");
       if(!micBtn) return;
       micBtn.dataset.active = on ? "1" : "0";
       micBtn.setAttribute("aria-pressed", on ? "true" : "false");
       const label = micBtn.querySelector(".label");
       if (label) label.textContent = on ? (selectedMicLabel || "Sharing Your Audio") : "Share Your Audio";
     }
-
     function setTabUI(on){
+      const tabBtn = document.getElementById("startTab");
       if(!tabBtn) return;
       tabBtn.dataset.active = on ? "1" : "0";
       tabBtn.setAttribute("aria-pressed", on ? "true" : "false");
@@ -398,11 +344,11 @@ export default function InterviewRoom() {
       if (label) label.textContent = on ? "Interviewer Audio (On)" : "Simulated Interviewer Audio";
     }
 
-    const micActive = () => micOn;  // <— use flag, not WS state
+    const micActive = () => micOn;
     const tabActive = () => !!(wsTab && wsTab.readyState === WebSocket.OPEN);
 
-    // ===== MIC =====
-    async function startMic(useDeviceId = null) {
+    // ===== MIC (accept prepared stream) =====
+    async function startMic(useDeviceId = null, existingStream = null) {
       if (micOn) { setStatus("mic already running"); return; }
 
       const sessionId = await ensureSession();
@@ -415,17 +361,14 @@ export default function InterviewRoom() {
         micModuleLoaded = true;
       }
 
-      const constraints = {
-        audio: {
-          deviceId: useDeviceId ? { exact: useDeviceId } : undefined,
-          echoCancellation: true,
-          noiseSuppression: true
-        },
-        video: false,
-      };
-
       try {
-        streamMic = await navigator.mediaDevices.getUserMedia(constraints);
+        streamMic = existingStream || await navigator.mediaDevices.getUserMedia({
+          audio: {
+            deviceId: useDeviceId ? { exact: useDeviceId } : undefined,
+            echoCancellation: true, noiseSuppression: true
+          },
+          video: false
+        });
       } catch (e) {
         setStatus(e?.name === "NotAllowedError" ? "mic blocked" : "mic failed");
         setMicUI(false);
@@ -437,15 +380,14 @@ export default function InterviewRoom() {
       node.port.onmessage = (ev) => {
         const frame = ev.data;
         if (meetMuted === true) return;
-        if (meetMuted === null && rms(frame) < VAD_THRESH) return;
+        if (meetMuted === null && rms(frame) <  VAD_THRESH) return;
         const i16 = downsampleFloat32ToInt16(frame, acMic.sampleRate, 16000);
-        bufMic.push(i16);
-        lenMic += i16.length;
+        bufMic.push(i16); lenMic += i16.length;
       };
       src.connect(node);
       nodeMic = node;
 
-      micOn = true;            // <— mark on
+      micOn = true;
       setMicUI(true);
 
       wsMic = openWS("mic", sessionId, "interviewer", interviewerName);
@@ -454,41 +396,35 @@ export default function InterviewRoom() {
     }
 
     function stopMic() {
-      if (!micOn && !wsMic && !streamMic) return;
       if (sendTimerMic) { clearInterval(sendTimerMic); sendTimerMic = null; }
       if (wsMic) { try { wsMic.close(); } catch {} wsMic = null; }
       if (nodeMic) { try { nodeMic.disconnect(); } catch {} nodeMic = null; }
       if (streamMic) { try { streamMic.getTracks().forEach((t) => t.stop()); } catch {} streamMic = null; }
       bufMic = []; lenMic = 0;
-      micOn = false;           // <— mark off
+      micOn = false;
       setMicUI(false);
       setStatus("mic off");
     }
 
-    // ===== TAB =====
-    async function startTab() {
+    // ===== TAB (accept prepared stream) =====
+    async function startTab(existingStream = null) {
       if (wsTab && wsTab.readyState === WebSocket.OPEN) {
-        setStatus("tab already running");
-        return;
+        setStatus("tab already running"); return;
       }
 
-      setStatus("opening tab picker…");
-
-      let pickedStream;
-      try {
-        pickedStream = await navigator.mediaDevices.getDisplayMedia({
-          video: { displaySurface: "browser", preferCurrentTab: true },
-          audio: {
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false,
-            suppressLocalAudioPlayback: true
-          }
-        });
-      } catch (e) {
-        setStatus(e?.name === "NotAllowedError" ? "tab share cancelled" : "tab share failed");
-        setTabUI(false);
-        return;
+      let pickedStream = existingStream;
+      if (!pickedStream) {
+        setStatus("opening tab picker…");
+        try {
+          pickedStream = await navigator.mediaDevices.getDisplayMedia({
+            video: { displaySurface: "browser", preferCurrentTab: true },
+            audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: true }
+          });
+        } catch (e) {
+          setStatus(e?.name === "NotAllowedError" ? "tab share cancelled" : "tab share failed");
+          setTabUI(false);
+          return;
+        }
       }
 
       if (!acTab)
@@ -499,11 +435,6 @@ export default function InterviewRoom() {
       }
 
       streamTab = pickedStream;
-
-      if (!streamTab.getAudioTracks().length) {
-        setStatus("tab selected without audio — enable “Share tab audio”");
-      }
-
       try {
         streamTab.getTracks().forEach(t =>
           t.addEventListener("ended", () => { stopTab(); setTabUI(false); })
@@ -514,10 +445,9 @@ export default function InterviewRoom() {
       const node = new AudioWorkletNode(acTab, "mic-processor");
       node.port.onmessage = (ev) => {
         const frame = ev.data;
-        if (rms(frame) < VAD_THRESH) return;
+        if (rms(frame) < 0.0025) return;
         const i16 = downsampleFloat32ToInt16(frame, acTab.sampleRate, 16000);
-        bufTab.push(i16);
-        lenTab += i16.length;
+        bufTab.push(i16); lenTab += i16.length;
       };
       src.connect(node);
       nodeTab = node;
@@ -540,8 +470,16 @@ export default function InterviewRoom() {
     }
 
     function stopAll() {
+      // Stop your streams & sockets
       stopMic();
       stopTab();
+
+      // Exit PiP if active
+      try { stopPiP(); } catch {}
+
+      // Close the Meet tab if we opened it in Preflight
+      try { mediaBus.closeMeetWindow(); } catch {}
+
       setMicUI(false);
       setTabUI(false);
       setStatus("stopped");
@@ -549,80 +487,90 @@ export default function InterviewRoom() {
 
     async function postJSON(url, body) {
       const r = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
       if (!r.ok) throw new Error(await r.text());
       return r.json();
     }
 
-    // === AI: Validate
     const onValidate = async () => {
       await ensureSession();
-      const q = (vQ.textContent || "").trim();
+      const q = (document.getElementById("v_question").textContent || "").trim();
       if (!q) return alert("Pick a question (send ➤) first");
-      vVerd.textContent = "";
-      vScore.textContent = "";
-      vExplain.textContent = "…";
-      vCand.textContent = "";
+      document.getElementById("v_verdict").textContent = "";
+      document.getElementById("v_score").textContent = "";
+      document.getElementById("v_explain").textContent = "…";
+      document.getElementById("v_cand").textContent = "";
       try {
         const data = await postJSON(`${BACKEND_HTTP}/ai/validate`, {
-          session_id: metaRef.current.sessionId,
-          question: q,
+          session_id: metaRef.current.sessionId, question: q,
         });
-        vExplain.textContent = data.explanation || "";
-        vCand.textContent = data.candidate_answer
-          ? `Candidate’s Answer: ${data.candidate_answer}`
-          : "";
-        vScore.textContent = `Score: ${(data.score * 100).toFixed(0)}%`;
-        vVerd.textContent = (data.verdict || "").toUpperCase();
-        vVerd.className =
-          "ir-badge " +
-          (data.verdict === "right"
-            ? "ir-ok"
-            : data.verdict === "almost"
-            ? "ir-warn"
-            : "ir-bad");
+        document.getElementById("v_explain").textContent = data.explanation || "";
+        document.getElementById("v_cand").textContent = data.candidate_answer ? `Candidate’s Answer: ${data.candidate_answer}` : "";
+        document.getElementById("v_score").textContent = `Score: ${(data.score * 100).toFixed(0)}%`;
+        const v = (data.verdict || "").toUpperCase();
+        const el = document.getElementById("v_verdict");
+        el.textContent = v;
+        el.className = "ir-badge " + (data.verdict === "right" ? "ir-ok" : data.verdict === "almost" ? "ir-warn" : "ir-bad");
       } catch (e) {
-        vExplain.textContent = "Error: " + e.message;
+        document.getElementById("v_explain").textContent = "Error: " + e.message;
       }
     };
 
-    // === AI: questions
+    // Use single endpoint for follow-ups
     async function getQs(append = false) {
       await ensureSession();
       try {
-        const url = append
-          ? `${BACKEND_HTTP}/ai/questions/more`
-          : `${BACKEND_HTTP}/ai/questions`;
-        const data = await postJSON(url, { session_id: metaRef.current.sessionId, count: 5 });
-        if (!append) suggUL.innerHTML = "";
-        (data.questions || []).forEach((q) => {
+        const url = `${BACKEND_HTTP}/ai/questions`;
+        const data = await postJSON(url, {
+          session_id: metaRef.current.sessionId,
+          count: 5,
+        });
+        if (!append) document.getElementById("suggestions").innerHTML = "";
+        const list = Array.isArray(data?.questions) ? data.questions : (Array.isArray(data) ? data : []);
+        list.forEach((q) => {
           const li = document.createElement("li");
           li.textContent = q;
-          suggUL.appendChild(li);
+          document.getElementById("suggestions").appendChild(li);
         });
       } catch (e) {
         alert("AI error: " + e.message);
       }
     }
 
-    // === AI: summary
+    // Load stored transcript turns (GET /session/{id}/turns)
+    async function loadTurns() {
+      const id = await ensureSession();
+      try {
+        const r = await fetch(`${BACKEND_HTTP}/session/${encodeURIComponent(id)}/turns`);
+        if (!r.ok) throw new Error(await r.text());
+        const data = await r.json();
+        const turns = Array.isArray(data?.turns) ? data.turns : (Array.isArray(data) ? data : []);
+        finalsEl.innerHTML = "";
+        turns.forEach(t => {
+          const who = t.speaker_name || t.speaker || "Unknown";
+          const text = t.text ?? t.content ?? t.utterance ?? "";
+          const isInterviewer = String(t.speaker || "").toLowerCase() === "interviewer";
+          if (!text) return;
+          finalsEl.appendChild(lineEl(who, text, isInterviewer));
+        });
+        finalsEl.scrollTop = finalsEl.scrollHeight;
+      } catch (e) {
+        console.warn("turns fetch failed:", e);
+      }
+    }
+
     const onSummary = async () => {
       await ensureSession();
-      aiOut.textContent = "…";
+      const out = document.getElementById("aiOut");
+      out.textContent = "…";
       try {
-        const data = await postJSON(`${BACKEND_HTTP}/ai/summary`, {
-          session_id: metaRef.current.sessionId,
-        });
-        aiOut.textContent = JSON.stringify(data, null, 2);
-      } catch (e) {
-        aiOut.textContent = "Error: " + e.message;
-      }
+        const data = await postJSON(`${BACKEND_HTTP}/ai/summary`, { session_id: metaRef.current.sessionId });
+        out.textContent = JSON.stringify(data, null, 2);
+      } catch (e) { out.textContent = "Error: " + e.message; }
     };
 
-    // ===== Dropdown rendering & handlers =====
     function renderMicMenu() {
       if (!micMenu) return;
       micMenu.innerHTML = "";
@@ -631,121 +579,83 @@ export default function InterviewRoom() {
       title.textContent = "Select microphone";
       micMenu.appendChild(title);
 
-      // Default
       const def = document.createElement("button");
       def.className = "item";
       def.textContent = "System Default";
       def.dataset.active = selectedMicId ? "0" : "1";
       def.addEventListener("click", async () => {
-        selectedMicId = null;
-        selectedMicLabel = "System Default";
+        selectedMicId = null; selectedMicLabel = "System Default";
         micLabelEl && (micLabelEl.textContent = "Share Your Audio");
-        renderMicMenu();
-        if (micActive()) { stopMic(); await startMic(null); }
-        closeMicMenu();
+        renderMicMenu(); if (micActive()) { stopMic(); await startMic(null); } closeMicMenu();
       });
       micMenu.appendChild(def);
 
-      // List devices
       for (const d of audioInputs) {
         const b = document.createElement("button");
         b.className = "item";
         b.textContent = d.label || "Microphone";
         b.dataset.active = d.deviceId === selectedMicId ? "1" : "0";
         b.addEventListener("click", async () => {
-          selectedMicId = d.deviceId || null;
-          selectedMicLabel = d.label || "Microphone";
+          selectedMicId = d.deviceId || null; selectedMicLabel = d.label || "Microphone";
           micLabelEl && (micLabelEl.textContent = "Share Your Audio");
-          renderMicMenu();
-          if (micActive()) { stopMic(); await startMic(selectedMicId); }
-          closeMicMenu();
+          renderMicMenu(); if (micActive()) { stopMic(); await startMic(selectedMicId); } closeMicMenu();
         });
         micMenu.appendChild(b);
       }
 
-      // Divider
-      const line = document.createElement("div");
-      line.className = "line";
-      micMenu.appendChild(line);
+      const line = document.createElement("div"); line.className = "line"; micMenu.appendChild(line);
 
-      // Refresh + Turn off
       const refresh = document.createElement("button");
-      refresh.className = "item";
-      refresh.textContent = "Refresh device list";
-      refresh.addEventListener("click", async () => {
-        await enumerateAudioInputs();
-      });
+      refresh.className = "item"; refresh.textContent = "Refresh device list";
+      refresh.addEventListener("click", async () => { await enumerateAudioInputs(); });
       micMenu.appendChild(refresh);
 
       const off = document.createElement("button");
-      off.className = "item";
-      off.textContent = micActive() ? "Turn off microphone" : "Microphone is off";
+      off.className = "item"; off.textContent = micActive() ? "Turn off microphone" : "Microphone is off";
       off.disabled = !micActive();
-      off.addEventListener("click", () => {
-        stopMic();
-        closeMicMenu();
-      });
+      off.addEventListener("click", () => { stopMic(); closeMicMenu(); });
       micMenu.appendChild(off);
     }
 
     function openMicMenu() {
       if (!micMenu) return;
-      renderMicMenu();
-      micMenu.dataset.open = "1";
+      renderMicMenu(); micMenu.dataset.open = "1";
       micBtn?.setAttribute("aria-expanded", "true");
-      setTimeout(() => {
-        document.addEventListener("click", outsideCloseOnce, { capture: true, once: true });
-      }, 0);
+      setTimeout(() => { document.addEventListener("click", outsideCloseOnce, { capture: true, once: true }); }, 0);
     }
     function closeMicMenu() {
       if (!micMenu) return;
-      micMenu.dataset.open = "0";
-      micBtn?.setAttribute("aria-expanded", "false");
+      micMenu.dataset.open = "0"; micBtn?.setAttribute("aria-expanded", "false");
     }
     function outsideCloseOnce(e) {
       if (!micMenu || !micBtn) return;
       if (micMenu.contains(e.target) || micBtn.contains(e.target)) {
-        document.addEventListener("click", outsideCloseOnce, { capture: true, once: true });
-        return;
+        document.addEventListener("click", outsideCloseOnce, { capture: true, once: true }); return;
       }
       closeMicMenu();
     }
 
-    // ===== Bind buttons — split behavior =====
-    const micBodyHandler = async () => {
-      if (micActive()) { stopMic(); }
-      else { await startMic(selectedMicId); }
-    };
-    const micCaretHandler = (ev) => {
-      ev.stopPropagation(); // prevent toggling mic
-      const open = micMenu?.dataset.open === "1";
-      if (open) closeMicMenu(); else openMicMenu();
-    };
-
-    // Fallback: click anywhere on the button except the caret/menu toggles mic
+    const micBodyHandler = async () => { if (micActive()) { stopMic(); } else { await startMic(selectedMicId); } };
+    const micCaretHandler = (ev) => { ev.stopPropagation(); const open = micMenu?.dataset.open === "1"; if (open) closeMicMenu(); else openMicMenu(); };
     const micButtonFallbackHandler = (ev) => {
-      const caret = $("micCaret");
-      const menu  = $("micMenu");
-      if (caret?.contains(ev.target) || menu?.contains(ev.target)) return;
-      micBodyHandler();
+      const caret = document.getElementById("micCaret"); const menu  = document.getElementById("micMenu");
+      if (caret?.contains(ev.target) || menu?.contains(ev.target)) return; micBodyHandler();
     };
 
-    const tabClickHandler = async () => {
-      if (tabActive()) { stopTab(); } else { await startTab(); }
-    };
+    const tabClickHandler = async () => { if (tabActive()) { stopTab(); } else { await startTab(); } };
     const stopClickHandler = () => { stopAll(); };
-
     const getQsHandler = () => getQs(false);
     const moreQsHandler = () => getQs(true);
+    const loadTurnsHandler = () => loadTurns();
 
-    $("v_validate")?.addEventListener("click", onValidate);
-    $("getQs")?.addEventListener("click", getQsHandler);
-    $("moreQs")?.addEventListener("click", moreQsHandler);
-    $("aiSummary")?.addEventListener("click", onSummary);
+    document.getElementById("v_validate")?.addEventListener("click", onValidate);
+    document.getElementById("getQs")?.addEventListener("click", getQsHandler);
+    document.getElementById("moreQs")?.addEventListener("click", moreQsHandler);
+    document.getElementById("aiSummary")?.addEventListener("click", onSummary);
+    document.getElementById("loadTurns")?.addEventListener("click", loadTurnsHandler);
 
-    // Split handlers for mic button
-    const micBody = $("micBody");
-    const micCaret = $("micCaret");
+    const micBody = document.getElementById("micBody");
+    const micCaret = document.getElementById("micCaret");
     micBody?.addEventListener("click", micBodyHandler);
     micCaret?.addEventListener("click", micCaretHandler);
     micBtn?.addEventListener("click", micButtonFallbackHandler);
@@ -753,14 +663,31 @@ export default function InterviewRoom() {
     tabBtn?.addEventListener("click", tabClickHandler);
     stopBtn?.addEventListener("click", stopClickHandler);
 
-    // Initial enumerate
+    // Initial enumerate + load any existing transcript history
     enumerateAudioInputs();
+    loadTurns();
+
+    // ---- Autostart from Preflight (uses prepared streams) ----
+    (async () => {
+      const wants = state?.autostart || {};
+      try {
+        if (wants.mic && mediaBus.micStream) {
+          await startMic(null, mediaBus.takeMicStream()); // prepared mic
+        }
+        if (wants.tab && mediaBus.tabStream) {
+          await startTab(mediaBus.takeTabStream());       // prepared tab (Meet)
+        }
+      } catch (e) {
+        console.warn("Autostart failed:", e);
+      }
+    })();
 
     return () => {
-      $("v_validate")?.removeEventListener("click", onValidate);
-      $("getQs")?.removeEventListener("click", getQsHandler);
-      $("moreQs")?.removeEventListener("click", moreQsHandler);
-      $("aiSummary")?.removeEventListener("click", onSummary);
+      document.getElementById("v_validate")?.removeEventListener("click", onValidate);
+      document.getElementById("getQs")?.removeEventListener("click", getQsHandler);
+      document.getElementById("moreQs")?.removeEventListener("click", moreQsHandler);
+      document.getElementById("aiSummary")?.removeEventListener("click", onSummary);
+      document.getElementById("loadTurns")?.removeEventListener("click", loadTurnsHandler);
 
       micBody?.removeEventListener("click", micBodyHandler);
       micCaret?.removeEventListener("click", micCaretHandler);
@@ -769,131 +696,66 @@ export default function InterviewRoom() {
       stopBtn?.removeEventListener("click", stopClickHandler);
 
       try { navigator.mediaDevices?.removeEventListener?.("devicechange", enumerateAudioInputs); } catch {}
+      // Ensure everything is torn down (including PiP + Meet tab)
       stopAll();
       document.body.classList.remove("interview-room-body");
     };
   }, [state]);
 
-  const IconMic = (p) => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" {...p}>
-      <path d="M12 14a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3z"/>
-      <path d="M5 11a1 1 0 1 0-2 0 9 9 0 0 0 8 8v3h2v-3a9 9 0 0 0 8-8 1 1 0 1 0-2 0 7 7 0 0 1-14 0z"/>
-    </svg>
-  );
-  const IconChevronDown = (p) => (
-    <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" {...p}>
-      <path d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.94l3.71-3.71a.75.75 0 1 1 1.06 1.06l-4.24 4.24a.75.75 0 0 1-1.06 0L5.21 8.29a.75.75 0 0 1 .02-1.08z"/>
-    </svg>
-  );
-  const IconMonitor = (p) => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" {...p}>
-      <path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-6v2h3v2H8v-2h3v-2H5a2 2 0 0 1-2-2V5z"/>
-    </svg>
-  );
-  const IconExit = (p) => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" {...p}>
-      <path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5v-2H5V5h5V3z"/>
-      <path d="M15.59 7.41 14.17 8.83 16.34 11H9v2h7.34l-2.17 2.17 1.42 1.42L21 12l-5.41-4.59z"/>
-    </svg>
-  );
+  const IconMic = (p) => (<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M12 14a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3z"/><path d="M5 11a1 1 0 1 0-2 0 9 9 0 0 0 8 8v3h2v-3a9 9 0 0 0 8-8 1 1 0 1 0-2 0 7 7 0 0 1-14 0z"/></svg>);
+  const IconChevronDown = (p) => (<svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" {...p}><path d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.94l3.71-3.71a.75.75 0 1 1 1.06 1.06l-4.24 4.24a.75.75 0 0 1-1.06 0L5.21 8.29a.75.75 0 0 1 .02-1.08z"/></svg>);
+  const IconMonitor = (p) => (<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-6v2h3v2H8v-2h3v-2H5a2 2 0 0 1-2-2V5z"/></svg>);
+  const IconExit = (p) => (<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5v-2H5V5h5V3z"/><path d="M15.59 7.41 14.17 8.83 16.34 11H9v2h7.34l-2.17 2.17 1.42 1.42L21 12l-5.41-4.59z"/></svg>);
 
   return (
     <div className="ir-wrap">
       <style>{styles}</style>
 
-     <header className="ir-header">
-  <div className="ir-row" style={{ width: "100%" }}>
-    {/* MIC button with split (body toggles, caret opens menu) */}
-    <button id="startMic" className="ir-btn icon micbtn" title="Share your microphone" aria-expanded="false">
-      <span className="split">
-        <span id="micBody" className="body">
-          <span className="ir-icon mic"><IconMic /></span>
-          <span id="micLabel" className="label">Share Your Audio</span>
-        </span>
-        <span id="micCaret" className="caret" aria-haspopup="menu">
-          <IconChevronDown />
-        </span>
-      </span>
-      {/* anchored dropdown */}
-      <div id="micMenu" className="ir-menu" role="menu" aria-label="Select microphone"></div>
-    </button>
+      <header className="ir-header">
+        <div className="ir-row" style={{ width: "100%" }}>
+          <button id="startMic" className="ir-btn icon micbtn" title="Share your microphone" aria-expanded="false">
+            <span className="split">
+              <span id="micBody" className="body">
+                <span className="ir-icon mic"><IconMic /></span>
+                <span id="micLabel" className="label">Share Your Audio</span>
+              </span>
+              <span id="micCaret" className="caret" aria-haspopup="menu"><IconChevronDown /></span>
+            </span>
+            <div id="micMenu" className="ir-menu" role="menu" aria-label="Select microphone"></div>
+          </button>
 
-    <button id="startTab" className="ir-btn icon secondary tabbtn" title="Capture Meet tab audio">
-      <span className="ir-icon monitor"><IconMonitor /></span>
-      <span className="label">Simulated Interviewer Audio</span>
-    </button>
+          <button id="startTab" className="ir-btn icon secondary tabbtn" title="Capture Meet tab audio">
+            <span className="ir-icon monitor"><IconMonitor /></span>
+            <span className="label">Simulated Interviewer Audio</span>
+          </button>
 
-    <button id="stop" className="ir-btn icon danger" title="Exit interview session">
-      <span className="ir-icon"><IconExit /></span>
-      <span className="label">Exit</span>
-    </button>
+          <button id="stop" className="ir-btn icon danger" title="Exit interview session">
+            <span className="ir-icon"><IconExit /></span>
+            <span className="label">Exit</span>
+          </button>
 
-    <button id="getQs" className="ir-btn secondary" style={{ marginLeft: "auto" }}>
-      AI Questions
-    </button>
-    <button id="moreQs" className="ir-btn secondary">View more</button>
+          <button id="getQs" className="ir-btn secondary" style={{ marginLeft: "auto" }}>
+            AI Questions
+          </button>
+          <button id="moreQs" className="ir-btn secondary">View more</button>
+          <button id="loadTurns" className="ir-btn secondary">Reload History</button>
 
-    <span id="status" className="ir-pill" style={{ marginLeft: 12 }}>
-      idle
-    </span>
-  </div>
-</header>
+          <span id="status" className="ir-pill" style={{ marginLeft: 12 }}>idle</span>
+        </div>
+      </header>
 
       <main className="ir-main ir-stack">
-        {/* Controls only (no meta fields) */}
-        {/* <section className="ir-panel ir-stack"> */}
-          {/* <div className="ir-row">
-        
-            <button id="startMic" className="ir-btn icon micbtn" title="Share your microphone" aria-expanded="false">
-              <span className="split">
-                <span id="micBody" className="body">
-                  <span className="ir-icon mic"><IconMic /></span>
-                  <span id="micLabel" className="label">Share Your Audio</span>
-                </span>
-                <span id="micCaret" className="caret" aria-haspopup="menu">
-                  <IconChevronDown />
-                </span>
-              </span>
-
-             
-              <div id="micMenu" className="ir-menu" role="menu" aria-label="Select microphone"></div>
-            </button>
-
-            <button id="startTab" className="ir-btn icon secondary tabbtn" title="Capture Meet tab audio">
-              <span className="ir-icon monitor"><IconMonitor /></span>
-              <span className="label">Simulated Interviewer Audio</span>
-            </button>
-
-            <button id="stop" className="ir-btn icon danger" title="Exit interview session">
-              <span className="ir-icon"><IconExit /></span>
-              <span className="label">Exit</span>
-            </button>
-
-            <button id="getQs" className="ir-btn secondary" style={{ marginLeft: "auto" }}>
-              AI Questions
-            </button>
-            <button id="moreQs" className="ir-btn secondary">View more</button>
-          </div>
-        </section> */}
-
-        {/* 3-column layout */}
         <section className="ir-grid">
-          {/* Left: Transcript */}
           <div className="ir-panel">
             <div className="ir-pill" style={{ marginBottom: 8 }}>Transcript</div>
             <div id="interim" className="ir-interim" />
             <div id="finals" className="ra-scroll" style={{ maxHeight: 420, overflow: "auto" }} />
-            <div className="ir-tiny">
-              Tip: Send (➤) appears only for <em>interviewer</em> lines.
-            </div>
+            <div className="ir-tiny">Tip: Send (➤) appears only for <em>interviewer</em> lines.</div>
           </div>
 
-          {/* Middle: Validation panel */}
           <div className="ir-panel">
             <div className="ir-pill" style={{ marginBottom: 8 }}>Validation</div>
-            <div style={{ marginBottom: 8 }}>
-              <strong>Question:</strong> <span id="v_question" />
-            </div>
+            <div style={{ marginBottom: 8 }}><strong>Question:</strong> <span id="v_question" /></div>
             <div style={{ marginBottom: 8 }}>
               <strong>Expected Answer</strong>
               <div id="v_expected" style={{ marginTop: 6 }} />
@@ -907,7 +769,6 @@ export default function InterviewRoom() {
             </div>
           </div>
 
-          {/* Right: Suggested questions + summary */}
           <div className="ir-panel ir-rightbox">
             <div>
               <div className="ir-pill" style={{ marginBottom: 8 }}>AI Suggestions</div>
@@ -916,9 +777,7 @@ export default function InterviewRoom() {
             <div className="ir-summary-wrap">
               <div className="ir-pill" style={{ marginBottom: 8 }}>Summary (on demand)</div>
               <pre id="aiOut" className="ir-pre" style={{ marginTop: 8 }} />
-              <button id="aiSummary" className="ir-btn" style={{ marginTop: 8 }}>
-                Generate Summary
-              </button>
+              <button id="aiSummary" className="ir-btn" style={{ marginTop: 8 }}>Generate Summary</button>
             </div>
           </div>
         </section>
