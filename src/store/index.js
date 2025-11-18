@@ -12,12 +12,14 @@ import rightSidePanelReducer from './slices/UI Slice/panelSlice';
 import createJDReducer from './slices/UI Slice/CreateJDSlice';
 import uploadJDReducer from './slices/uploadJdSlice';
 import resumeParseReducer from './slices/parseResumeSlice';
-
+import interviewSessionReducer, {
+  saveInterviewSessionToStorage,
+} from "./slices/interviewSessionSlice";
 // Create Saga Middleware
 const sagaMiddleware = createSagaMiddleware();
 
 
-const STORAGE_KEY = "rightPanelState";
+// const STORAGE_KEY = "rightPanelState";
 
 const store = configureStore({
     reducer: {
@@ -29,7 +31,8 @@ const store = configureStore({
         rightPanel: rightSidePanelReducer,
         uploadJD: uploadJDReducer,
         createJD:createJDReducer,
-        resumeParse:resumeParseReducer
+        resumeParse:resumeParseReducer,
+          interviewSession: interviewSessionReducer, 
     },
      middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({  serializableCheck: false,thunk: false }).concat(sagaMiddleware),
@@ -40,18 +43,32 @@ const store = configureStore({
 sagaMiddleware.run(rootSaga);
 
 // persist on change (throttled enough for this use-case)
-let prev;
+const RIGHT_PANEL_STORAGE_KEY = "rightPanelState";
+
+let prevRightPanel;
+
 store.subscribe(() => {
   const state = store.getState();
-  const slice = state.panel;
-  if (prev === slice) return;
-  prev = slice;
-  try {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ open: slice.open, activeKey: slice.activeKey })
-    );
-  } catch {}
-});
+
+  // ---- Persist right panel UI state ----
+  const panelSlice = state.rightPanel; // ✅ correct key
+  if (panelSlice && panelSlice !== prevRightPanel) {
+    prevRightPanel = panelSlice;
+    try {
+      localStorage.setItem(
+        RIGHT_PANEL_STORAGE_KEY,
+        JSON.stringify({
+          open: panelSlice.open,
+          activeKey: panelSlice.activeKey,
+        })
+      );
+    } catch (e) {
+      // ignore storage errors
+    }
+  }
+
+  // ---- ALWAYS persist interview session slice ----
+  saveInterviewSessionToStorage(state);
+})
 
 export default store;

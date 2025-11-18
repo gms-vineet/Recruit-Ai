@@ -1,8 +1,12 @@
-// src/components/Modal/PreflightModal.jsx
+// // src/components/Modal/PreflightModal.jsx
+// import React, { useEffect, useRef, useState } from "react";
+// import { useNavigate } from "react-router-dom";
+// import mediaBus, { pipFromStream } from "@/lib/mediaBus";
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
 import mediaBus, { pipFromStream } from "@/lib/mediaBus";
-
+import { prepareInterview } from "@/store/slices/interviewSessionSlice";
 export default function PreflightModal({
   open,
   defaultMeet = "",
@@ -13,6 +17,7 @@ export default function PreflightModal({
   onClose,
 }) {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [meetUrl, setMeetUrl] = useState(defaultMeet);
   const [micReady, setMicReady] = useState(false);
   const [tabReady, setTabReady] = useState(false);
@@ -83,15 +88,25 @@ export default function PreflightModal({
   function startInterview() {
     if (micStreamRef.current) mediaBus.setMicStream(micStreamRef.current);
 
+    dispatch(
+     prepareInterview({
+       interviewerName,
+       candidateName,
+       jd: jdText,
+       resume: resumeText,
+       meetUrl: meetUrl || "",
+     })
+   );
+
     navigate("/interview-room", {
       state: {
         autostart: { mic: !!micStreamRef.current, tab: !!tabStreamRef.current },
-        interviewer: interviewerName,
-        candidate: candidateName,
-        jd: jdText,
-        resume: resumeText,
-        meetUrl: meetUrl || "",
-        sessionId: "",
+        // interviewer: interviewerName,
+        // candidate: candidateName,
+        // jd: jdText,
+        // resume: resumeText,
+        // meetUrl: meetUrl || "",
+        // sessionId: "",
         promptMic: false,
       },
     });

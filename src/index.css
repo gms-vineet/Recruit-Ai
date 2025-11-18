@@ -12,6 +12,11 @@
     --color-bg-surface: #ffffff;
 
     --color-logo-color: #64748b;
+      --wa-in:#0b1220;     /* incoming bubble */
+  --wa-out:#16a34a;    /* outgoing bubble (emerald) */
+  --wa-text:#E9EDEF;
+  --bubble-max-h:140px;
+    
   }
 
   .dark {
@@ -98,3 +103,68 @@
 /* visual “on” state */
 .ir-btn[data-active="1"]{outline:1px solid #22c55e;background:#102a19}
 .ir-btn.micbtn[data-active="1"]{outline-color:#ef4444;background:#2a0f14}
+
+
+.ir-chatlog{ overflow-y:auto; overflow-x:hidden; }
+
+.ir-msg{ display:flex; width:100%; }
+.ir-msg.mine{ justify-content:flex-end; }
+
+.ir-bubble{
+  position:relative;
+  display:flex;                /* <-- inline layout */
+  align-items:flex-start;
+  gap:8px;                     /* space between text & send */
+  max-width:78%;
+  max-height:var(--bubble-max-h);
+  overflow:auto;
+  padding:10px 12px;
+  border-radius:16px;
+  word-break:break-word;
+  background:var(--wa-in);
+  color:var(--wa-text);
+  border:1px solid rgba(255,255,255,.06);
+  box-shadow:0 1px 0 rgba(0,0,0,.15);
+}
+
+.ir-msg.mine .ir-bubble{
+  background:var(--wa-out);
+  border-color:rgba(0,0,0,.12);
+}
+
+/* text flexes; button stays to the side */
+.ir-bubble .who{ display:none; }
+.ir-bubble .txt{ white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; }
+
+/* compact circular send button INSIDE bubble */
+.ir-sendbtn{
+  width:28px; height:28px;
+  padding:0;
+  display:inline-flex; align-items:center; justify-content:center;
+  border-radius:999px;
+  background:rgba(0,0,0,.18);
+  border:1px solid rgba(255,255,255,.15);
+  color:#e5e7eb;
+  cursor:pointer;
+  margin:0;                    /* no bottom margin */
+}
+.ir-msg.mine .ir-sendbtn{ background:rgba(0,0,0,.22); }
+.ir-sendbtn:hover{ filter:brightness(1.1); }
+
+/* subtle bubble tails */
+.ir-bubble:after{
+  content:""; position:absolute; bottom:0; width:16px; height:16px; background:inherit;
+}
+.ir-msg.their .ir-bubble:after{ left:-6px;  clip-path:polygon(0 100%, 100% 0, 100% 100%); }
+.ir-msg.mine  .ir-bubble:after{ right:-6px; clip-path:polygon(0 0, 100% 100%, 0 100%); }
+
+/* thin scrollbar for long messages inside bubble */
+.ir-bubble::-webkit-scrollbar{ width:6px; }
+.ir-bubble::-webkit-scrollbar-thumb{ background:#334155; border-radius:6px; }
+
+/* --- Header timer (Meet-style) --- */
+.ir-timer{
+  font-variant-numeric: tabular-nums;
+  background:#0b1220;
+  color:#cbd5e1;
+}

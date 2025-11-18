@@ -1,7 +1,17 @@
-// src/pages/InterviewRoom.jsx
+// src/pages/InterviewRoom.jsx (or wherever you keep it)
 import React, { useEffect, useRef } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import mediaBus, { stopPiP } from "@/lib/mediaBus";
+import {
+  setInterviewSessionId,
+  setInterviewStatus,
+  setInterviewError,
+  endInterviewSession,
+  setValidationData,
+  setAISuggestions,
+  setSummary,
+} from "@/store/slices/interviewSessionSlice";
 
 const styles = `
 :root { --bg:#0b0f14; --fg:#e6edf3; --muted:#9aa3ac; --chip:#1f2937; }
@@ -48,13 +58,25 @@ body.interview-room-body { background:var(--bg); }
 
 export default function InterviewRoom() {
   const { state } = useLocation() || {};
+  const dispatch = useDispatch();
+    const navigate = useNavigate(); 
+  const interviewSession = useSelector((s) => s.interviewSession);
+
+  // NEW: shared promise so /session/start runs only once
+  const sessionInitRef = useRef(null);
+
+  // persists base metadata across refresh (hydrated from Redux/localStorage)
   const metaRef = useRef({
-    sessionId: state?.sessionId || "",
-    interviewer: state?.interviewer || "",
-    candidate: state?.candidate || "",
-    jd: state?.jd || "",
-    resume: state?.resume || "",
-    meetUrl: state?.meetUrl || "",
+    sessionId: interviewSession?.sessionId || state?.sessionId || "",
+    interviewer:
+      interviewSession?.interviewerName ||
+      state?.interviewer ||
+      "Interviewer",
+    candidate:
+      interviewSession?.candidateName || state?.candidate || "Candidate",
+    jd: interviewSession?.jd || state?.jd || "",
+    resume: interviewSession?.resume || state?.resume || "",
+    meetUrl: interviewSession?.meetUrl || state?.meetUrl || "",
   });
 
   useEffect(() => {
@@ -69,6 +91,16 @@ export default function InterviewRoom() {
     const httpURL = new URL(BACKEND_HTTP);
     const BACKEND_WS =
       (httpURL.protocol === "https:" ? "wss://" : "ws://") + httpURL.host;
+
+    const REQUEST_TIMEOUT_MS = 10000; // 10s
+
+    const fetchWithTimeout = (url, options = {}, ms = REQUEST_TIMEOUT_MS) => {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), ms);
+      return fetch(url, { ...options, signal: controller.signal }).finally(() =>
+        clearTimeout(id)
+      );
+    };
 
     // ===== Device/UI state =====
     let selectedMicId = null;
@@ -98,11 +130,16 @@ export default function InterviewRoom() {
       const ratio = inRate / outRate;
       const newLen = Math.floor(float32.length / ratio);
       const out = new Int16Array(newLen);
-      let o = 0, i = 0;
+      let o = 0,
+        i = 0;
       while (o < newLen) {
         const next = Math.round((o + 1) * ratio);
-        let acc = 0, cnt = 0;
-        while (i < next && i < float32.length) { acc += float32[i++]; cnt++; }
+        let acc = 0,
+          cnt = 0;
+        while (i < next && i < float32.length) {
+          acc += float32[i++];
+          cnt++;
+        }
         const sample = Math.max(-1, Math.min(1, acc / (cnt || 1)));
         out[o++] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
       }
@@ -123,8 +160,10 @@ export default function InterviewRoom() {
     let wsMic, wsTab;
     let sendTimerMic, sendTimerTab;
 
-    let bufMic = [], lenMic = 0;
-    let bufTab = [], lenTab = 0;
+    let bufMic = [],
+      lenMic = 0;
+    let bufTab = [],
+      lenTab = 0;
 
     let streamMic = null;
     let streamTab = null;
@@ -147,24 +186,103 @@ export default function InterviewRoom() {
     const micMenu = $("micMenu");
     const micLabelEl = $("micLabel");
 
-    const setStatus = (t) => { if (statusEl) statusEl.textContent = t; };
+    const setStatus = (t) => {
+      if (statusEl) statusEl.textContent = t;
+    };
+
+    function hydrateFromStore() {
+      // 1) Validation panel
+      const vState = interviewSession?.validation;
+      if (vState) {
+        const {
+          question,
+          expectedAnswer,
+          verdict,
+          score,
+          explanation,
+          candidateAnswer,
+        } = vState;
+
+        if (vQ) vQ.textContent = question || "";
+        if (vE) vE.textContent = expectedAnswer || "";
+        if (vExplain) vExplain.textContent = explanation || "";
+        if (vCand)
+          vCand.textContent = candidateAnswer
+            ? `Candidate’s Answer: ${candidateAnswer}`
+            : "";
+
+        if (vScore && typeof score === "number") {
+          vScore.textContent = `Score: ${(score * 100).toFixed(0)}%`;
+        }
+
+        if (vVerd) {
+          const vUpper = (verdict || "").toUpperCase();
+          vVerd.textContent = vUpper;
+          vVerd.className =
+            "ir-badge " +
+            (verdict === "right"
+              ? "ir-ok"
+              : verdict === "almost"
+              ? "ir-warn"
+              : verdict
+              ? "ir-bad"
+              : "");
+        }
+      }
+
+      // 2) AI Suggestions list
+      const savedSug = interviewSession?.aiSuggestions;
+      if (Array.isArray(savedSug) && savedSug.length) {
+        const ul = document.getElementById("suggestions");
+        if (ul) {
+          ul.innerHTML = "";
+          savedSug.forEach((q) => {
+            const li = document.createElement("li");
+            li.textContent = q;
+            ul.appendChild(li);
+          });
+        }
+      }
+
+      // 3) Summary block
+      if (interviewSession?.summary) {
+        const out = document.getElementById("aiOut");
+        if (out) {
+          out.textContent = JSON.stringify(interviewSession.summary, null, 2);
+        }
+      }
+    }
+
+    hydrateFromStore();
 
     async function enumerateAudioInputs() {
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         audioInputs = devices
           .filter((d) => d.kind === "audioinput")
-          .map((d) => ({ deviceId: d.deviceId, label: d.label || "Microphone", kind: d.kind }));
+          .map((d) => ({
+            deviceId: d.deviceId,
+            label: d.label || "Microphone",
+            kind: d.kind,
+          }));
         renderMicMenu();
       } catch {}
     }
 
     async function prewarmMicPermission(forceRealPrompt = false) {
       const shouldPromptNow = !!forceRealPrompt || state?.promptMic === true;
-      if (!("mediaDevices" in navigator) || !navigator.mediaDevices.getUserMedia) {
-        setStatus("mic permission: unsupported"); return;
+      if (
+        !("mediaDevices" in navigator) ||
+        !navigator.mediaDevices.getUserMedia
+      ) {
+        setStatus("mic permission: unsupported");
+        return;
       }
-      if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
+      if (
+        location.protocol !== "https:" &&
+        location.hostname !== "localhost" &&
+        location.hostname !== "127.0.0.1"
+      ) {
         setStatus("use HTTPS or localhost for mic");
       }
       try {
@@ -184,57 +302,95 @@ export default function InterviewRoom() {
     else setTimeout(() => prewarmMicPermission(false), 150);
 
     try {
-      navigator.mediaDevices?.addEventListener?.("devicechange", enumerateAudioInputs);
+      navigator.mediaDevices?.addEventListener?.(
+        "devicechange",
+        enumerateAudioInputs
+      );
     } catch {}
 
+    // ========= SINGLE-FLIGHT SESSION INIT =========
     async function ensureSession() {
-      if (!metaRef.current.sessionId) {
-        metaRef.current.sessionId = `MEET-${Math.random().toString(36).slice(2, 9)}`;
+      // If we already kicked off session init, reuse that promise
+      if (sessionInitRef.current) {
+        return sessionInitRef.current;
       }
-      try {
-        const body = {
-          meeting_id: metaRef.current.sessionId,
-          interviewer_name: metaRef.current.interviewer || "",
-          candidate_name: metaRef.current.candidate || "",
-          jd: metaRef.current.jd || "",
-          resume: metaRef.current.resume || "",
-          meet_url: metaRef.current.meetUrl || "",
-        };
 
-        const r = await fetch(`${BACKEND_HTTP}/session/start`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body)
-        });
-
-        if (r.ok) {
-          let data = null;
-          try { data = await r.json(); } catch {}
-          if (data) {
-            // Allow backend to echo/override fields
-            metaRef.current.interviewer = data.interviewer_name ?? metaRef.current.interviewer;
-            metaRef.current.candidate   = data.candidate_name   ?? metaRef.current.candidate;
-            metaRef.current.jd          = data.jd               ?? metaRef.current.jd;
-            metaRef.current.resume      = data.resume           ?? metaRef.current.resume;
-            metaRef.current.meetUrl     = data.meet_url         ?? metaRef.current.meetUrl;
-          }
-          setStatus(`session ${metaRef.current.sessionId} ready`);
-        } else {
-          setStatus("session/start failed");
+      sessionInitRef.current = (async () => {
+        // 1) Ensure we have a local sessionId
+        if (!metaRef.current.sessionId) {
+          const newId = `MEET-${Math.random().toString(36).slice(2, 9)}`;
+          metaRef.current.sessionId = newId;
+          dispatch(setInterviewSessionId(newId));
+          dispatch(setInterviewStatus("active"));
         }
-      } catch {
-        setStatus(`session ${metaRef.current.sessionId} (offline)`);
-      }
-      return metaRef.current.sessionId;
+
+        // 2) Try to register/start that session on the backend
+        try {
+          const body = {
+            meeting_id: metaRef.current.sessionId,
+            interviewer_name: metaRef.current.interviewer || "",
+            candidate_name: metaRef.current.candidate || "",
+            jd: metaRef.current.jd || "",
+            resume: metaRef.current.resume || "",
+            meet_url: metaRef.current.meetUrl || "",
+          };
+
+          const r = await fetchWithTimeout(`${BACKEND_HTTP}/session/start`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+
+          if (r.ok) {
+            let data = null;
+            try {
+              data = await r.json();
+            } catch {}
+
+            if (data) {
+              metaRef.current.interviewer =
+                data.interviewer_name ?? metaRef.current.interviewer;
+              metaRef.current.candidate =
+                data.candidate_name ?? metaRef.current.candidate;
+              metaRef.current.jd = data.jd ?? metaRef.current.jd;
+              metaRef.current.resume = data.resume ?? metaRef.current.resume;
+              metaRef.current.meetUrl =
+                data.meet_url ?? metaRef.current.meetUrl;
+            }
+
+            setStatus(`session ${metaRef.current.sessionId} ready`);
+            dispatch(setInterviewError(null));
+          } else {
+            const msg = `session/start failed (${r.status})`;
+            setStatus(msg);
+            dispatch(setInterviewError(msg));
+          }
+        } catch (err) {
+          const msg =
+            err?.name === "AbortError"
+              ? "session/start timed out"
+              : err?.message ||
+                `session ${metaRef.current.sessionId} (offline)`;
+          setStatus(msg);
+          dispatch(setInterviewError(msg));
+        }
+
+        return metaRef.current.sessionId;
+      })();
+
+      return sessionInitRef.current;
     }
 
     function addSendButton(div, who, text) {
-      const interviewerName = metaRef.current.interviewer?.trim() || "Interviewer";
+      const interviewerName =
+        metaRef.current.interviewer?.trim() || "Interviewer";
       if (who !== interviewerName) return;
+
       const btn = document.createElement("button");
       btn.className = "ir-sendbtn";
       btn.title = "Send question to AI";
       btn.innerHTML = "➤ Send";
+
       btn.addEventListener("click", async () => {
         vQ.textContent = text;
         vE.textContent = "…";
@@ -242,13 +398,43 @@ export default function InterviewRoom() {
         vScore.textContent = "";
         vExplain.textContent = "";
         vCand.textContent = "";
+
+        // 🔹 persist base validation state (question only)
+        dispatch(
+          setValidationData({
+            question: text,
+            expectedAnswer: "",
+            verdict: null,
+            score: null,
+            explanation: "",
+            candidateAnswer: "",
+          })
+        );
+
         try {
           const data = await postJSON(`${BACKEND_HTTP}/ai/expected`, {
-            session_id: metaRef.current.sessionId, question: text,
+            session_id: metaRef.current.sessionId,
+            question: text,
           });
-          vE.textContent = data.expected_answer || "";
-        } catch (e) { vE.textContent = "Error: " + e.message; }
+          const expectedAnswer = data.expected_answer || "";
+          vE.textContent = expectedAnswer;
+
+          // 🔹 update persisted expected answer
+          dispatch(
+            setValidationData({
+              question: text,
+              expectedAnswer,
+              verdict: null,
+              score: null,
+              explanation: "",
+              candidateAnswer: "",
+            })
+          );
+        } catch (e) {
+          vE.textContent = "Error: " + e.message;
+        }
       });
+
       div.appendChild(btn);
     }
 
@@ -268,18 +454,32 @@ export default function InterviewRoom() {
     }
 
     function openWS(source, sessionId, speaker, speakerName) {
-      const qs = `session_id=${encodeURIComponent(sessionId)}&speaker=${encodeURIComponent(speaker)}&speaker_name=${encodeURIComponent(speakerName)}`;
+      const qs = `session_id=${encodeURIComponent(
+        sessionId
+      )}&speaker=${encodeURIComponent(
+        speaker
+      )}&speaker_name=${encodeURIComponent(speakerName)}`;
       const wss = new WebSocket(`${BACKEND_WS}/ws/${source}?${qs}`);
       wss.binaryType = "arraybuffer";
       wss.onopen = () => {
         setStatus(`ws connected (${source})`);
-        if (source === "mic") { micOn = true; setMicUI(true); }
-        if (source === "tab") { setTabUI(true); }
+        if (source === "mic") {
+          micOn = true;
+          setMicUI(true);
+        }
+        if (source === "tab") {
+          setTabUI(true);
+        }
       };
       wss.onclose = () => {
         setStatus(`ws closed (${source})`);
-        if (source === "mic") { micOn = false; setMicUI(false); }
-        if (source === "tab") { setTabUI(false); }
+        if (source === "mic") {
+          micOn = false;
+          setMicUI(false);
+        }
+        if (source === "tab") {
+          setTabUI(false);
+        }
       };
       wss.onmessage = (evt) => {
         try {
@@ -306,42 +506,62 @@ export default function InterviewRoom() {
         if (sendTimerMic) return;
         sendTimerMic = setInterval(() => {
           if (!wsMic || wsMic.readyState !== WebSocket.OPEN) return;
-          if (lenMic === 0) { wsMic.send(SILENCE_100MS); return; }
+          if (lenMic === 0) {
+            wsMic.send(SILENCE_100MS);
+            return;
+          }
           const all = new Int16Array(lenMic);
           let off = 0;
-          for (const c of bufMic) { all.set(c, off); off += c.length; }
-          bufMic = []; lenMic = 0;
+          for (const c of bufMic) {
+            all.set(c, off);
+            off += c.length;
+          }
+          bufMic = [];
+          lenMic = 0;
           wsMic.send(new Uint8Array(all.buffer));
         }, every);
       } else {
         if (sendTimerTab) return;
         sendTimerTab = setInterval(() => {
           if (!wsTab || wsTab.readyState !== WebSocket.OPEN) return;
-          if (lenTab === 0) { wsTab.send(SILENCE_100MS); return; }
+          if (lenTab === 0) {
+            wsTab.send(SILENCE_100MS);
+            return;
+          }
           const all = new Int16Array(lenTab);
           let off = 0;
-          for (const c of bufTab) { all.set(c, off); off += c.length; }
-          bufTab = []; lenTab = 0;
+          for (const c of bufTab) {
+            all.set(c, off);
+            off += c.length;
+          }
+          bufTab = [];
+          lenTab = 0;
           wsTab.send(new Uint8Array(all.buffer));
         }, every);
       }
     }
 
-    function setMicUI(on){
+    function setMicUI(on) {
       const micBtn = document.getElementById("startMic");
-      if(!micBtn) return;
+      if (!micBtn) return;
       micBtn.dataset.active = on ? "1" : "0";
       micBtn.setAttribute("aria-pressed", on ? "true" : "false");
       const label = micBtn.querySelector(".label");
-      if (label) label.textContent = on ? (selectedMicLabel || "Sharing Your Audio") : "Share Your Audio";
+      if (label)
+        label.textContent = on
+          ? selectedMicLabel || "Sharing Your Audio"
+          : "Share Your Audio";
     }
-    function setTabUI(on){
+    function setTabUI(on) {
       const tabBtn = document.getElementById("startTab");
-      if(!tabBtn) return;
+      if (!tabBtn) return;
       tabBtn.dataset.active = on ? "1" : "0";
       tabBtn.setAttribute("aria-pressed", on ? "true" : "false");
       const label = tabBtn.querySelector(".label");
-      if (label) label.textContent = on ? "Interviewer Audio (On)" : "Simulated Interviewer Audio";
+      if (label)
+        label.textContent = on
+          ? "Interviewer Audio (On)"
+          : "Simulated Interviewer Audio";
     }
 
     const micActive = () => micOn;
@@ -349,26 +569,35 @@ export default function InterviewRoom() {
 
     // ===== MIC (accept prepared stream) =====
     async function startMic(useDeviceId = null, existingStream = null) {
-      if (micOn) { setStatus("mic already running"); return; }
+      if (micOn) {
+        setStatus("mic already running");
+        return;
+      }
 
       const sessionId = await ensureSession();
-      const interviewerName = metaRef.current.interviewer?.trim() || "Interviewer";
+      const interviewerName =
+        metaRef.current.interviewer?.trim() || "Interviewer";
 
       if (!acMic)
-        acMic = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+        acMic = new (window.AudioContext || window.webkitAudioContext)({
+          sampleRate: 48000,
+        });
       if (!micModuleLoaded) {
         await acMic.audioWorklet.addModule("/static/mic-worklet.js");
         micModuleLoaded = true;
       }
 
       try {
-        streamMic = existingStream || await navigator.mediaDevices.getUserMedia({
-          audio: {
-            deviceId: useDeviceId ? { exact: useDeviceId } : undefined,
-            echoCancellation: true, noiseSuppression: true
-          },
-          video: false
-        });
+        streamMic =
+          existingStream ||
+          (await navigator.mediaDevices.getUserMedia({
+            audio: {
+              deviceId: useDeviceId ? { exact: useDeviceId } : undefined,
+              echoCancellation: true,
+              noiseSuppression: true,
+            },
+            video: false,
+          }));
       } catch (e) {
         setStatus(e?.name === "NotAllowedError" ? "mic blocked" : "mic failed");
         setMicUI(false);
@@ -380,9 +609,10 @@ export default function InterviewRoom() {
       node.port.onmessage = (ev) => {
         const frame = ev.data;
         if (meetMuted === true) return;
-        if (meetMuted === null && rms(frame) <  VAD_THRESH) return;
+        if (meetMuted === null && rms(frame) < VAD_THRESH) return;
         const i16 = downsampleFloat32ToInt16(frame, acMic.sampleRate, 16000);
-        bufMic.push(i16); lenMic += i16.length;
+        bufMic.push(i16);
+        lenMic += i16.length;
       };
       src.connect(node);
       nodeMic = node;
@@ -396,11 +626,30 @@ export default function InterviewRoom() {
     }
 
     function stopMic() {
-      if (sendTimerMic) { clearInterval(sendTimerMic); sendTimerMic = null; }
-      if (wsMic) { try { wsMic.close(); } catch {} wsMic = null; }
-      if (nodeMic) { try { nodeMic.disconnect(); } catch {} nodeMic = null; }
-      if (streamMic) { try { streamMic.getTracks().forEach((t) => t.stop()); } catch {} streamMic = null; }
-      bufMic = []; lenMic = 0;
+      if (sendTimerMic) {
+        clearInterval(sendTimerMic);
+        sendTimerMic = null;
+      }
+      if (wsMic) {
+        try {
+          wsMic.close();
+        } catch {}
+        wsMic = null;
+      }
+      if (nodeMic) {
+        try {
+          nodeMic.disconnect();
+        } catch {}
+        nodeMic = null;
+      }
+      if (streamMic) {
+        try {
+          streamMic.getTracks().forEach((t) => t.stop());
+        } catch {}
+        streamMic = null;
+      }
+      bufMic = [];
+      lenMic = 0;
       micOn = false;
       setMicUI(false);
       setStatus("mic off");
@@ -409,7 +658,8 @@ export default function InterviewRoom() {
     // ===== TAB (accept prepared stream) =====
     async function startTab(existingStream = null) {
       if (wsTab && wsTab.readyState === WebSocket.OPEN) {
-        setStatus("tab already running"); return;
+        setStatus("tab already running");
+        return;
       }
 
       let pickedStream = existingStream;
@@ -418,17 +668,28 @@ export default function InterviewRoom() {
         try {
           pickedStream = await navigator.mediaDevices.getDisplayMedia({
             video: { displaySurface: "browser", preferCurrentTab: true },
-            audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, suppressLocalAudioPlayback: true }
+            audio: {
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
+              suppressLocalAudioPlayback: true,
+            },
           });
         } catch (e) {
-          setStatus(e?.name === "NotAllowedError" ? "tab share cancelled" : "tab share failed");
+          setStatus(
+            e?.name === "NotAllowedError"
+              ? "tab share cancelled"
+              : "tab share failed"
+          );
           setTabUI(false);
           return;
         }
       }
 
       if (!acTab)
-        acTab = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+        acTab = new (window.AudioContext || window.webkitAudioContext)({
+          sampleRate: 48000,
+        });
       if (!tabModuleLoaded) {
         await acTab.audioWorklet.addModule("/static/mic-worklet.js");
         tabModuleLoaded = true;
@@ -436,8 +697,11 @@ export default function InterviewRoom() {
 
       streamTab = pickedStream;
       try {
-        streamTab.getTracks().forEach(t =>
-          t.addEventListener("ended", () => { stopTab(); setTabUI(false); })
+        streamTab.getTracks().forEach((t) =>
+          t.addEventListener("ended", () => {
+            stopTab();
+            setTabUI(false);
+          })
         );
       } catch {}
 
@@ -447,13 +711,15 @@ export default function InterviewRoom() {
         const frame = ev.data;
         if (rms(frame) < 0.0025) return;
         const i16 = downsampleFloat32ToInt16(frame, acTab.sampleRate, 16000);
-        bufTab.push(i16); lenTab += i16.length;
+        bufTab.push(i16);
+        lenTab += i16.length;
       };
       src.connect(node);
       nodeTab = node;
 
       const sessionId = await ensureSession();
-      const candidateName = metaRef.current.candidate?.trim() || "Candidate";
+      const candidateName =
+        metaRef.current.candidate?.trim() || "Candidate";
       wsTab = openWS("tab", sessionId, "candidate", candidateName);
       startSender("tab");
       setStatus("recording (tab)…");
@@ -461,11 +727,30 @@ export default function InterviewRoom() {
     }
 
     function stopTab() {
-      if (sendTimerTab) { clearInterval(sendTimerTab); sendTimerTab = null; }
-      if (wsTab) { try { wsTab.close(); } catch {} wsTab = null; }
-      if (nodeTab) { try { nodeTab.disconnect(); } catch {} nodeTab = null; }
-      if (streamTab) { try { streamTab.getTracks().forEach((t) => t.stop()); } catch {} streamTab = null; }
-      bufTab = []; lenTab = 0;
+      if (sendTimerTab) {
+        clearInterval(sendTimerTab);
+        sendTimerTab = null;
+      }
+      if (wsTab) {
+        try {
+          wsTab.close();
+        } catch {}
+        wsTab = null;
+      }
+      if (nodeTab) {
+        try {
+          nodeTab.disconnect();
+        } catch {}
+        nodeTab = null;
+      }
+      if (streamTab) {
+        try {
+          streamTab.getTracks().forEach((t) => t.stop());
+        } catch {}
+        streamTab = null;
+      }
+      bufTab = [];
+      lenTab = 0;
       setTabUI(false);
     }
 
@@ -475,10 +760,14 @@ export default function InterviewRoom() {
       stopTab();
 
       // Exit PiP if active
-      try { stopPiP(); } catch {}
+      try {
+        stopPiP();
+      } catch {}
 
       // Close the Meet tab if we opened it in Preflight
-      try { mediaBus.closeMeetWindow(); } catch {}
+      try {
+        mediaBus.closeMeetWindow();
+      } catch {}
 
       setMicUI(false);
       setTabUI(false);
@@ -486,8 +775,9 @@ export default function InterviewRoom() {
     }
 
     async function postJSON(url, body) {
-      const r = await fetch(url, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+      const r = await fetchWithTimeout(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
       if (!r.ok) throw new Error(await r.text());
@@ -496,25 +786,58 @@ export default function InterviewRoom() {
 
     const onValidate = async () => {
       await ensureSession();
-      const q = (document.getElementById("v_question").textContent || "").trim();
+      const q =
+        (document.getElementById("v_question").textContent || "").trim();
       if (!q) return alert("Pick a question (send ➤) first");
+
       document.getElementById("v_verdict").textContent = "";
       document.getElementById("v_score").textContent = "";
       document.getElementById("v_explain").textContent = "…";
       document.getElementById("v_cand").textContent = "";
+
       try {
         const data = await postJSON(`${BACKEND_HTTP}/ai/validate`, {
-          session_id: metaRef.current.sessionId, question: q,
+          session_id: metaRef.current.sessionId,
+          question: q,
         });
-        document.getElementById("v_explain").textContent = data.explanation || "";
-        document.getElementById("v_cand").textContent = data.candidate_answer ? `Candidate’s Answer: ${data.candidate_answer}` : "";
-        document.getElementById("v_score").textContent = `Score: ${(data.score * 100).toFixed(0)}%`;
+
+        document.getElementById("v_explain").textContent =
+          data.explanation || "";
+        document.getElementById("v_cand").textContent = data.candidate_answer
+          ? `Candidate’s Answer: ${data.candidate_answer}`
+          : "";
+        document.getElementById(
+          "v_score"
+        ).textContent = `Score: ${(data.score * 100).toFixed(0)}%`;
+
         const v = (data.verdict || "").toUpperCase();
         const el = document.getElementById("v_verdict");
         el.textContent = v;
-        el.className = "ir-badge " + (data.verdict === "right" ? "ir-ok" : data.verdict === "almost" ? "ir-warn" : "ir-bad");
+        el.className =
+          "ir-badge " +
+          (data.verdict === "right"
+            ? "ir-ok"
+            : data.verdict === "almost"
+            ? "ir-warn"
+            : "ir-bad");
+
+        const expected =
+          (document.getElementById("v_expected").textContent || "").trim();
+
+        // 🔹 persist full validation result
+        dispatch(
+          setValidationData({
+            question: q,
+            expectedAnswer: expected,
+            verdict: data.verdict || "",
+            score: data.score,
+            explanation: data.explanation || "",
+            candidateAnswer: data.candidate_answer || "",
+          })
+        );
       } catch (e) {
-        document.getElementById("v_explain").textContent = "Error: " + e.message;
+        document.getElementById("v_explain").textContent =
+          "Error: " + e.message;
       }
     };
 
@@ -527,13 +850,28 @@ export default function InterviewRoom() {
           session_id: metaRef.current.sessionId,
           count: 5,
         });
-        if (!append) document.getElementById("suggestions").innerHTML = "";
-        const list = Array.isArray(data?.questions) ? data.questions : (Array.isArray(data) ? data : []);
+
+        const list = Array.isArray(data?.questions)
+          ? data.questions
+          : Array.isArray(data)
+          ? data
+          : [];
+
+        const ul = document.getElementById("suggestions");
+        if (!append && ul) ul.innerHTML = "";
         list.forEach((q) => {
           const li = document.createElement("li");
           li.textContent = q;
-          document.getElementById("suggestions").appendChild(li);
+          ul.appendChild(li);
         });
+
+        // 🔹 Persist all questions currently visible in the UL
+        if (ul) {
+          const all = Array.from(ul.querySelectorAll("li")).map(
+            (li) => li.textContent || ""
+          );
+          dispatch(setAISuggestions(all));
+        }
       } catch (e) {
         alert("AI error: " + e.message);
       }
@@ -543,15 +881,23 @@ export default function InterviewRoom() {
     async function loadTurns() {
       const id = await ensureSession();
       try {
-        const r = await fetch(`${BACKEND_HTTP}/session/${encodeURIComponent(id)}/turns`);
+        const r = await fetchWithTimeout(
+          `${BACKEND_HTTP}/session/${encodeURIComponent(id)}/turns`,
+          { method: "GET" }
+        );
         if (!r.ok) throw new Error(await r.text());
         const data = await r.json();
-        const turns = Array.isArray(data?.turns) ? data.turns : (Array.isArray(data) ? data : []);
+        const turns = Array.isArray(data?.turns)
+          ? data.turns
+          : Array.isArray(data)
+          ? data
+          : [];
         finalsEl.innerHTML = "";
-        turns.forEach(t => {
+        turns.forEach((t) => {
           const who = t.speaker_name || t.speaker || "Unknown";
           const text = t.text ?? t.content ?? t.utterance ?? "";
-          const isInterviewer = String(t.speaker || "").toLowerCase() === "interviewer";
+          const isInterviewer =
+            String(t.speaker || "").toLowerCase() === "interviewer";
           if (!text) return;
           finalsEl.appendChild(lineEl(who, text, isInterviewer));
         });
@@ -566,9 +912,16 @@ export default function InterviewRoom() {
       const out = document.getElementById("aiOut");
       out.textContent = "…";
       try {
-        const data = await postJSON(`${BACKEND_HTTP}/ai/summary`, { session_id: metaRef.current.sessionId });
+        const data = await postJSON(`${BACKEND_HTTP}/ai/summary`, {
+          session_id: metaRef.current.sessionId,
+        });
         out.textContent = JSON.stringify(data, null, 2);
-      } catch (e) { out.textContent = "Error: " + e.message; }
+
+        // 🔹 persist summary
+        dispatch(setSummary(data));
+      } catch (e) {
+        out.textContent = "Error: " + e.message;
+      }
     };
 
     function renderMicMenu() {
@@ -584,9 +937,15 @@ export default function InterviewRoom() {
       def.textContent = "System Default";
       def.dataset.active = selectedMicId ? "0" : "1";
       def.addEventListener("click", async () => {
-        selectedMicId = null; selectedMicLabel = "System Default";
+        selectedMicId = null;
+        selectedMicLabel = "System Default";
         micLabelEl && (micLabelEl.textContent = "Share Your Audio");
-        renderMicMenu(); if (micActive()) { stopMic(); await startMic(null); } closeMicMenu();
+        renderMicMenu();
+        if (micActive()) {
+          stopMic();
+          await startMic(null);
+        }
+        closeMicMenu();
       });
       micMenu.appendChild(def);
 
@@ -596,63 +955,144 @@ export default function InterviewRoom() {
         b.textContent = d.label || "Microphone";
         b.dataset.active = d.deviceId === selectedMicId ? "1" : "0";
         b.addEventListener("click", async () => {
-          selectedMicId = d.deviceId || null; selectedMicLabel = d.label || "Microphone";
+          selectedMicId = d.deviceId || null;
+          selectedMicLabel = d.label || "Microphone";
           micLabelEl && (micLabelEl.textContent = "Share Your Audio");
-          renderMicMenu(); if (micActive()) { stopMic(); await startMic(selectedMicId); } closeMicMenu();
+          renderMicMenu();
+          if (micActive()) {
+            stopMic();
+            await startMic(selectedMicId);
+          }
+          closeMicMenu();
         });
         micMenu.appendChild(b);
       }
 
-      const line = document.createElement("div"); line.className = "line"; micMenu.appendChild(line);
+      const line = document.createElement("div");
+      line.className = "line";
+      micMenu.appendChild(line);
 
       const refresh = document.createElement("button");
-      refresh.className = "item"; refresh.textContent = "Refresh device list";
-      refresh.addEventListener("click", async () => { await enumerateAudioInputs(); });
+      refresh.className = "item";
+      refresh.textContent = "Refresh device list";
+      refresh.addEventListener("click", async () => {
+        await enumerateAudioInputs();
+      });
       micMenu.appendChild(refresh);
 
       const off = document.createElement("button");
-      off.className = "item"; off.textContent = micActive() ? "Turn off microphone" : "Microphone is off";
+      off.className = "item";
+      off.textContent = micActive()
+        ? "Turn off microphone"
+        : "Microphone is off";
       off.disabled = !micActive();
-      off.addEventListener("click", () => { stopMic(); closeMicMenu(); });
+      off.addEventListener("click", () => {
+        stopMic();
+        closeMicMenu();
+      });
       micMenu.appendChild(off);
     }
 
     function openMicMenu() {
       if (!micMenu) return;
-      renderMicMenu(); micMenu.dataset.open = "1";
+      renderMicMenu();
+      micMenu.dataset.open = "1";
       micBtn?.setAttribute("aria-expanded", "true");
-      setTimeout(() => { document.addEventListener("click", outsideCloseOnce, { capture: true, once: true }); }, 0);
+      setTimeout(() => {
+        document.addEventListener("click", outsideCloseOnce, {
+          capture: true,
+          once: true,
+        });
+      }, 0);
     }
     function closeMicMenu() {
       if (!micMenu) return;
-      micMenu.dataset.open = "0"; micBtn?.setAttribute("aria-expanded", "false");
+      micMenu.dataset.open = "0";
+      micBtn?.setAttribute("aria-expanded", "false");
     }
     function outsideCloseOnce(e) {
       if (!micMenu || !micBtn) return;
       if (micMenu.contains(e.target) || micBtn.contains(e.target)) {
-        document.addEventListener("click", outsideCloseOnce, { capture: true, once: true }); return;
+        document.addEventListener("click", outsideCloseOnce, {
+          capture: true,
+          once: true,
+        });
+        return;
       }
       closeMicMenu();
     }
 
-    const micBodyHandler = async () => { if (micActive()) { stopMic(); } else { await startMic(selectedMicId); } };
-    const micCaretHandler = (ev) => { ev.stopPropagation(); const open = micMenu?.dataset.open === "1"; if (open) closeMicMenu(); else openMicMenu(); };
+    const micBodyHandler = async () => {
+      if (micActive()) {
+        stopMic();
+      } else {
+        await startMic(selectedMicId);
+      }
+    };
+    const micCaretHandler = (ev) => {
+      ev.stopPropagation();
+      const open = micMenu?.dataset.open === "1";
+      if (open) closeMicMenu();
+      else openMicMenu();
+    };
     const micButtonFallbackHandler = (ev) => {
-      const caret = document.getElementById("micCaret"); const menu  = document.getElementById("micMenu");
-      if (caret?.contains(ev.target) || menu?.contains(ev.target)) return; micBodyHandler();
+      const caret = document.getElementById("micCaret");
+      const menu = document.getElementById("micMenu");
+      if (caret?.contains(ev.target) || menu?.contains(ev.target)) return;
+      micBodyHandler();
     };
 
-    const tabClickHandler = async () => { if (tabActive()) { stopTab(); } else { await startTab(); } };
-    const stopClickHandler = () => { stopAll(); };
+    const tabClickHandler = async () => {
+      if (tabActive()) {
+        stopTab();
+      } else {
+        await startTab();
+      }
+    };
+   const stopClickHandler = async () => {
+  // 1) Stop all audio / streams / PiP / Meet tab
+  stopAll();
+
+  // 2) Ensure session id exists
+  await ensureSession();
+  const sid = metaRef.current.sessionId;
+
+  // 3) Generate summary for this session and persist in Redux
+  try {
+    const data = await postJSON(`${BACKEND_HTTP}/ai/summary`, {
+      session_id: sid,
+    });
+    dispatch(setSummary(data));
+  } catch (e) {
+    console.warn("summary generation failed on Exit:", e);
+    // You could optionally store an error in Redux here
+  }
+
+  // 4) Mark the session as ended (we KEEP summary + sessionId)
+  dispatch(endInterviewSession());
+
+  // 5) Navigate to the Report page
+  navigate("/interview/report", {
+    state: { sessionId: sid }, // optional; report can also read from Redux
+  });
+};
     const getQsHandler = () => getQs(false);
     const moreQsHandler = () => getQs(true);
     const loadTurnsHandler = () => loadTurns();
 
-    document.getElementById("v_validate")?.addEventListener("click", onValidate);
+    document
+      .getElementById("v_validate")
+      ?.addEventListener("click", onValidate);
     document.getElementById("getQs")?.addEventListener("click", getQsHandler);
-    document.getElementById("moreQs")?.addEventListener("click", moreQsHandler);
-    document.getElementById("aiSummary")?.addEventListener("click", onSummary);
-    document.getElementById("loadTurns")?.addEventListener("click", loadTurnsHandler);
+    document
+      .getElementById("moreQs")
+      ?.addEventListener("click", moreQsHandler);
+    document
+      .getElementById("aiSummary")
+      ?.addEventListener("click", onSummary);
+    document
+      .getElementById("loadTurns")
+      ?.addEventListener("click", loadTurnsHandler);
 
     const micBody = document.getElementById("micBody");
     const micCaret = document.getElementById("micCaret");
@@ -675,7 +1115,7 @@ export default function InterviewRoom() {
           await startMic(null, mediaBus.takeMicStream()); // prepared mic
         }
         if (wants.tab && mediaBus.tabStream) {
-          await startTab(mediaBus.takeTabStream());       // prepared tab (Meet)
+          await startTab(mediaBus.takeTabStream()); // prepared tab (Meet)
         }
       } catch (e) {
         console.warn("Autostart failed:", e);
@@ -683,11 +1123,21 @@ export default function InterviewRoom() {
     })();
 
     return () => {
-      document.getElementById("v_validate")?.removeEventListener("click", onValidate);
-      document.getElementById("getQs")?.removeEventListener("click", getQsHandler);
-      document.getElementById("moreQs")?.removeEventListener("click", moreQsHandler);
-      document.getElementById("aiSummary")?.removeEventListener("click", onSummary);
-      document.getElementById("loadTurns")?.removeEventListener("click", loadTurnsHandler);
+      document
+        .getElementById("v_validate")
+        ?.removeEventListener("click", onValidate);
+      document
+        .getElementById("getQs")
+        ?.removeEventListener("click", getQsHandler);
+      document
+        .getElementById("moreQs")
+        ?.removeEventListener("click", moreQsHandler);
+      document
+        .getElementById("aiSummary")
+        ?.removeEventListener("click", onSummary);
+      document
+        .getElementById("loadTurns")
+        ?.removeEventListener("click", loadTurnsHandler);
 
       micBody?.removeEventListener("click", micBodyHandler);
       micCaret?.removeEventListener("click", micCaretHandler);
@@ -695,17 +1145,44 @@ export default function InterviewRoom() {
       tabBtn?.removeEventListener("click", tabClickHandler);
       stopBtn?.removeEventListener("click", stopClickHandler);
 
-      try { navigator.mediaDevices?.removeEventListener?.("devicechange", enumerateAudioInputs); } catch {}
+      try {
+        navigator.mediaDevices?.removeEventListener?.(
+          "devicechange",
+          enumerateAudioInputs
+        );
+      } catch {}
+
+      // reset single-flight promise on unmount
+      sessionInitRef.current = null;
+
       // Ensure everything is torn down (including PiP + Meet tab)
       stopAll();
       document.body.classList.remove("interview-room-body");
     };
-  }, [state]);
+  }, [state, dispatch, interviewSession, sessionInitRef, navigate]);
 
-  const IconMic = (p) => (<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M12 14a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3z"/><path d="M5 11a1 1 0 1 0-2 0 9 9 0 0 0 8 8v3h2v-3a9 9 0 0 0 8-8 1 1 0 1 0-2 0 7 7 0 0 1-14 0z"/></svg>);
-  const IconChevronDown = (p) => (<svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" {...p}><path d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.94l3.71-3.71a.75.75 0 1 1 1.06 1.06l-4.24 4.24a.75.75 0 0 1-1.06 0L5.21 8.29a.75.75 0 0 1 .02-1.08z"/></svg>);
-  const IconMonitor = (p) => (<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-6v2h3v2H8v-2h3v-2H5a2 2 0 0 1-2-2V5z"/></svg>);
-  const IconExit = (p) => (<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5v-2H5V5h5V3z"/><path d="M15.59 7.41 14.17 8.83 16.34 11H9v2h7.34l-2.17 2.17 1.42 1.42L21 12l-5.41-4.59z"/></svg>);
+  const IconMic = (p) => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" {...p}>
+      <path d="M12 14a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3z" />
+      <path d="M5 11a1 1 0 1 0-2 0 9 9 0 0 0 8 8v3h2v-3a9 9 0 0 0 8-8 1 1 0 1 0-2 0 7 7 0 0 1-14 0z" />
+    </svg>
+  );
+  const IconChevronDown = (p) => (
+    <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" {...p}>
+      <path d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.94l3.71-3.71a.75.75 0 1 1 1.06 1.06l-4.24 4.24a.75.75 0 0 1-1.06 0L5.21 8.29a.75.75 0 0 1 .02-1.08z" />
+    </svg>
+  );
+  const IconMonitor = (p) => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" {...p}>
+      <path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-6v2h3v2H8v-2h3v-2H5a2 2 0 0 1-2-2V5z" />
+    </svg>
+  );
+  const IconExit = (p) => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" {...p}>
+      <path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5v-2H5V5h5V3z" />
+      <path d="M15.59 7.41 14.17 8.83 16.34 11H9v2h7.34l-2.17 2.17 1.42 1.42L21 12l-5.41-4.59z" />
+    </svg>
+  );
 
   return (
     <div className="ir-wrap">
@@ -713,71 +1190,141 @@ export default function InterviewRoom() {
 
       <header className="ir-header">
         <div className="ir-row" style={{ width: "100%" }}>
-          <button id="startMic" className="ir-btn icon micbtn" title="Share your microphone" aria-expanded="false">
+          <button
+            id="startMic"
+            className="ir-btn icon micbtn"
+            title="Share your microphone"
+            aria-expanded="false"
+          >
             <span className="split">
               <span id="micBody" className="body">
-                <span className="ir-icon mic"><IconMic /></span>
-                <span id="micLabel" className="label">Share Your Audio</span>
+                <span className="ir-icon mic">
+                  <IconMic />
+                </span>
+                <span id="micLabel" className="label">
+                  Share Your Audio
+                </span>
               </span>
-              <span id="micCaret" className="caret" aria-haspopup="menu"><IconChevronDown /></span>
+              <span id="micCaret" className="caret" aria-haspopup="menu">
+                <IconChevronDown />
+              </span>
             </span>
-            <div id="micMenu" className="ir-menu" role="menu" aria-label="Select microphone"></div>
+            <div
+              id="micMenu"
+              className="ir-menu"
+              role="menu"
+              aria-label="Select microphone"
+            ></div>
           </button>
 
-          <button id="startTab" className="ir-btn icon secondary tabbtn" title="Capture Meet tab audio">
-            <span className="ir-icon monitor"><IconMonitor /></span>
+          <button
+            id="startTab"
+            className="ir-btn icon secondary tabbtn"
+            title="Capture Meet tab audio"
+          >
+            <span className="ir-icon monitor">
+              <IconMonitor />
+            </span>
             <span className="label">Simulated Interviewer Audio</span>
           </button>
 
-          <button id="stop" className="ir-btn icon danger" title="Exit interview session">
-            <span className="ir-icon"><IconExit /></span>
+          <button
+            id="stop"
+            className="ir-btn icon danger"
+            title="Exit interview session"
+          >
+            <span className="ir-icon">
+              <IconExit />
+            </span>
             <span className="label">Exit</span>
           </button>
 
-          <button id="getQs" className="ir-btn secondary" style={{ marginLeft: "auto" }}>
+          <button
+            id="getQs"
+            className="ir-btn secondary"
+            style={{ marginLeft: "auto" }}
+          >
             AI Questions
           </button>
-          <button id="moreQs" className="ir-btn secondary">View more</button>
-          <button id="loadTurns" className="ir-btn secondary">Reload History</button>
+          <button id="moreQs" className="ir-btn secondary">
+            View more
+          </button>
+          <button id="loadTurns" className="ir-btn secondary">
+            Reload History
+          </button>
 
-          <span id="status" className="ir-pill" style={{ marginLeft: 12 }}>idle</span>
+          <span id="status" className="ir-pill" style={{ marginLeft: 12 }}>
+            idle
+          </span>
         </div>
       </header>
 
       <main className="ir-main ir-stack">
         <section className="ir-grid">
           <div className="ir-panel">
-            <div className="ir-pill" style={{ marginBottom: 8 }}>Transcript</div>
+            <div className="ir-pill" style={{ marginBottom: 8 }}>
+              Transcript
+            </div>
             <div id="interim" className="ir-interim" />
-            <div id="finals" className="ra-scroll" style={{ maxHeight: 420, overflow: "auto" }} />
-            <div className="ir-tiny">Tip: Send (➤) appears only for <em>interviewer</em> lines.</div>
+            <div
+              id="finals"
+              className="ra-scroll"
+              style={{ maxHeight: 420, overflow: "auto" }}
+            />
+            <div className="ir-tiny">
+              Tip: Send (➤) appears only for <em>interviewer</em> lines.
+            </div>
           </div>
 
           <div className="ir-panel">
-            <div className="ir-pill" style={{ marginBottom: 8 }}>Validation</div>
-            <div style={{ marginBottom: 8 }}><strong>Question:</strong> <span id="v_question" /></div>
+            <div className="ir-pill" style={{ marginBottom: 8 }}>
+              Validation
+            </div>
+            <div style={{ marginBottom: 8 }}>
+              <strong>Question:</strong> <span id="v_question" />
+            </div>
             <div style={{ marginBottom: 8 }}>
               <strong>Expected Answer</strong>
               <div id="v_expected" style={{ marginTop: 6 }} />
             </div>
-            <button id="v_validate" className="ir-btn secondary">Validate</button>
+            <button id="v_validate" className="ir-btn secondary">
+              Validate
+            </button>
             <div id="v_out" style={{ marginTop: 10 }}>
               <span id="v_verdict" className="ir-badge" />
               <span id="v_score" className="ir-tiny" />
               <div id="v_explain" style={{ marginTop: 6 }} />
-              <div id="v_cand" className="ir-tiny" style={{ marginTop: 6 }} />
+              <div
+                id="v_cand"
+                className="ir-tiny"
+                style={{ marginTop: 6 }}
+              />
             </div>
           </div>
 
           <div className="ir-panel ir-rightbox">
             <div>
-              <div className="ir-pill" style={{ marginBottom: 8 }}>AI Suggestions</div>
+              <div className="ir-pill" style={{ marginBottom: 8 }}>
+                AI Suggestions
+              </div>
               <ul id="suggestions" />
             </div>
             <div className="ir-summary-wrap">
-              <div className="ir-pill" style={{ marginBottom: 8 }}>Summary (on demand)</div>
-              <pre id="aiOut" className="ir-pre" style={{ marginTop: 8 }} />
-              <button id="aiSummary" className="ir-btn" style={{ marginTop: 8 }}>Generate Summary</button>
+              <div className="ir-pill" style={{ marginBottom: 8 }}>
+                Summary (on demand)
+              </div>
+              <pre
+                id="aiOut"
+                className="ir-pre"
+                style={{ marginTop: 8 }}
+              />
+              <button
+                id="aiSummary"
+                className="ir-btn"
+                style={{ marginTop: 8 }}
+              >
+                Generate Summary
+              </button>
             </div>
           </div>
         </section>
