@@ -1,12 +1,11 @@
-// // src/components/Modal/PreflightModal.jsx
-// import React, { useEffect, useRef, useState } from "react";
-// import { useNavigate } from "react-router-dom";
-// import mediaBus, { pipFromStream } from "@/lib/mediaBus";
+// src/components/Modal/PreflightModal.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import mediaBus, { pipFromStream } from "@/lib/mediaBus";
 import { prepareInterview } from "@/store/slices/interviewSessionSlice";
+import SparkleButton from "../../components/buttons/SparkleButton"; // adjust if your path is different
+
 export default function PreflightModal({
   open,
   defaultMeet = "",
@@ -18,20 +17,27 @@ export default function PreflightModal({
 }) {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const [meetUrl, setMeetUrl] = useState(defaultMeet);
+  const [meetUrl, setMeetUrl] = useState(defaultMeet || "");
   const [micReady, setMicReady] = useState(false);
   const [tabReady, setTabReady] = useState(false);
   const micStreamRef = useRef(null);
   const tabStreamRef = useRef(null);
 
   useEffect(() => {
-    if (open) setMeetUrl(defaultMeet || "");
+    if (open) {
+      // reset from props when modal opens
+      setMeetUrl(defaultMeet || "");
+    }
   }, [open, defaultMeet]);
 
   useEffect(() => {
     if (!open) {
-      try { micStreamRef.current?.getTracks().forEach(t => t.stop()); } catch {}
-      try { tabStreamRef.current?.getTracks().forEach(t => t.stop()); } catch {}
+      try {
+        micStreamRef.current?.getTracks().forEach((t) => t.stop());
+      } catch {}
+      try {
+        tabStreamRef.current?.getTracks().forEach((t) => t.stop());
+      } catch {}
       micStreamRef.current = null;
       tabStreamRef.current = null;
       setMicReady(false);
@@ -46,6 +52,15 @@ export default function PreflightModal({
         video: false,
       });
       micStreamRef.current = s;
+
+      // 🔄 keep tick in sync if user stops mic sharing
+      s.getTracks().forEach((track) => {
+        track.onended = () => {
+          setMicReady(false);
+          micStreamRef.current = null;
+        };
+      });
+
       setMicReady(true);
     } catch {
       alert("Microphone permission denied or unavailable.");
@@ -54,12 +69,21 @@ export default function PreflightModal({
   }
 
   async function openMeetAndCaptureTab() {
+    if (!meetUrl || !/^https?:\/\//i.test(meetUrl)) {
+      alert("No meeting link is configured for this interview.");
+      return;
+    }
+
     let win = null;
-    if (meetUrl && /^https?:\/\//i.test(meetUrl)) {
+    try {
       win = window.open(meetUrl, "_blank", "noopener,noreferrer");
       mediaBus.setMeetWindow(win);
+    } catch {
+      // popup might be blocked; still try capture
     }
-    await new Promise(r => setTimeout(r, 300));
+
+    await new Promise((r) => setTimeout(r, 300));
+
     let s;
     try {
       s = await navigator.mediaDevices.getDisplayMedia({
@@ -68,18 +92,33 @@ export default function PreflightModal({
           echoCancellation: false,
           noiseSuppression: false,
           autoGainControl: false,
-          suppressLocalAudioPlayback: true
+          suppressLocalAudioPlayback: true,
         },
       });
     } catch {
-      alert("Tab capture cancelled/failed. Pick the Meet TAB and enable 'Share tab audio'.");
+      alert(
+        "Tab capture cancelled/failed. Pick the Meet TAB and enable 'Share tab audio'."
+      );
       setTabReady(false);
       return;
     }
+
     if (!s.getAudioTracks().length) {
       alert('No audio captured from the tab. Re-try and enable "Share tab audio".');
     }
-    try { await pipFromStream(s); } catch {}
+
+    // 🔄 keep tick in sync if user stops screen sharing
+    s.getTracks().forEach((track) => {
+      track.onended = () => {
+        setTabReady(false);
+        tabStreamRef.current = null;
+      };
+    });
+
+    try {
+      await pipFromStream(s);
+    } catch {}
+
     tabStreamRef.current = s;
     setTabReady(true);
     mediaBus.setTabStream(s);
@@ -89,24 +128,21 @@ export default function PreflightModal({
     if (micStreamRef.current) mediaBus.setMicStream(micStreamRef.current);
 
     dispatch(
-     prepareInterview({
-       interviewerName,
-       candidateName,
-       jd: jdText,
-       resume: resumeText,
-       meetUrl: meetUrl || "",
-     })
-   );
+      prepareInterview({
+        interviewerName,
+        candidateName,
+        jd: jdText,
+        resume: resumeText,
+        meetUrl: meetUrl || "",
+      })
+    );
 
     navigate("/interview-room", {
       state: {
-        autostart: { mic: !!micStreamRef.current, tab: !!tabStreamRef.current },
-        // interviewer: interviewerName,
-        // candidate: candidateName,
-        // jd: jdText,
-        // resume: resumeText,
-        // meetUrl: meetUrl || "",
-        // sessionId: "",
+        autostart: {
+          mic: !!micStreamRef.current,
+          tab: !!tabStreamRef.current,
+        },
         promptMic: false,
       },
     });
@@ -115,64 +151,190 @@ export default function PreflightModal({
 
   if (!open) return null;
 
+  // 🔹 stepper states
+  const step1Done = !!meetUrl; // meeting link configured
+  const step2Done = tabReady;  // interviewer audio shared
+  const step3Done = micReady;  // mic shared
+
+  const steps = [
+    { id: "s1", label: "Meeting tab", done: step1Done },
+    { id: "s2", label: "Interviewer audio", done: step2Done },
+    { id: "s3", label: "Your mic", done: step3Done },
+  ];
+  const completedCount = steps.filter((s) => s.done).length;
+  const allStepsDone = steps.every((s) => s.done);
+
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50">
-      <div className="w-[680px] rounded-xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900">
-        <div className="mb-4 text-lg font-semibold">Interview preflight</div>
-
-        <div className="space-y-4">
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60">
+      <div className="w-[560px] max-w-[95vw] rounded-2xl border border-slate-800 bg-slate-950 text-slate-100 shadow-2xl">
+        {/* main header – AI logo removed */}
+        <div className="flex items-start justify-between px-6 pt-5 pb-3 border-b border-slate-900/70">
           <div>
-            <label className="mb-1 block text-sm text-slate-600 dark:text-slate-300">
-              Meeting link (optional)
-            </label>
-            <input
-              value={meetUrl}
-              onChange={(e) => setMeetUrl(e.target.value)}
-              placeholder="https://meet.google.com/..."
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-            />
+            <h2 className="text-sm font-semibold">
+              Get ready with Interview Copilot
+            </h2>
+            <p className="mt-1 text-xs text-slate-400">
+              We&apos;ll listen to the meeting audio and your mic to generate
+              live notes and an interview summary for{" "}
+              <span className="font-medium text-slate-200">
+                {candidateName}
+              </span>
+              .
+            </p>
           </div>
 
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={pickMic}
-              className="rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
-            >
-              {micReady ? "Mic ✓" : "Pick Microphone"}
-            </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
 
-            <button
-              type="button"
-              onClick={openMeetAndCaptureTab}
-              className="rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
-              title="Opens Meet (if provided), then asks you to share that tab with audio, and starts PiP"
-            >
-              {tabReady ? "Meet Tab (PiP) ✓" : "Open Meet + Capture & PiP"}
-            </button>
-
-            <div className="ml-auto" />
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={!micReady && !tabReady}
-              onClick={startInterview}
-              className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Start Interview
-            </button>
+        {/* stepper header (no 1/2/3 numbers, just ticks/dots) */}
+        <div className="px-6 pt-3 pb-2">
+          <div className="mb-2 flex items-center justify-between text-[11px] text-slate-400">
+            <span className="uppercase tracking-wide text-[10px] text-slate-500">
+              Setup checklist
+            </span>
+            <span>{completedCount}/3 steps completed</span>
           </div>
 
-          <div className="text-xs text-slate-500 dark:text-slate-400">
-            Tip: In the tab picker, choose the Meet <b>tab</b> and enable “Share tab audio”.
+          <div className="flex items-center gap-2">
+            {steps.map((step, idx) => (
+              <React.Fragment key={step.id}>
+                <div className="flex items-center gap-1">
+                  <div
+                    className={[
+                      "flex h-6 w-6 items-center justify-center rounded-full border text-[12px] font-semibold",
+                      step.done
+                        ? "border-emerald-400 bg-emerald-500/20 text-emerald-200"
+                        : "border-slate-600 bg-slate-900 text-slate-600",
+                    ].join(" ")}
+                  >
+                    {step.done ? "✓" : ""}
+                  </div>
+                  <span className="hidden text-[11px] text-slate-300 sm:inline">
+                    {step.label}
+                  </span>
+                </div>
+                {idx < steps.length - 1 && (
+                  <div className="flex-1 h-px bg-slate-800/80" />
+                )}
+              </React.Fragment>
+            ))}
           </div>
+        </div>
+
+        {/* body with detailed instructions (no 1/2/3 bubbles on left) */}
+        <div className="px-6 pb-4 pt-3 text-xs">
+          <ol className="space-y-4">
+            {/* Step 1 */}
+            <li className="flex gap-3">
+              <div
+                // className={[
+                //   "mt-1 inline-flex h-5 w-5 items-center justify-center rounded-full border text-[11px]",
+                //   step1Done
+                //     ? "border-emerald-400 bg-emerald-500/20 text-emerald-200"
+                //     : "border-slate-600 bg-slate-900 text-slate-600",
+                // ].join(" ")}
+              >
+                {/* {step1Done ? "✓" : ""} */}
+              </div>
+              <div className="space-y-1">
+                <p className="font-medium text-slate-100">
+                  Open your meeting tab.
+                </p>
+                <p className="text-slate-400">
+                  If a meeting link is configured, we&apos;ll open it for you in
+                  a new tab when you share the interviewer&apos;s audio.
+                </p>
+                {!meetUrl && (
+                  <p className="text-xs text-amber-400">
+                    No Meet link is set for this interview. The interviewer
+                    should join their call manually before sharing audio.
+                  </p>
+                )}
+              </div>
+            </li>
+
+            {/* Step 2 */}
+            <li className="flex gap-3">
+              <div
+                // className={[
+                //   "mt-1 inline-flex h-5 w-5 items-center justify-center rounded-full border text-[11px]",
+                //   step2Done
+                //     ? "border-emerald-400 bg-emerald-500/20 text-emerald-200"
+                //     : "border-slate-600 bg-slate-900 text-slate-600",
+                // ].join(" ")}
+              >
+                {step2Done ? "✓" : ""}
+              </div>
+              <div className="space-y-1">
+                <p className="font-medium text-slate-100">
+                  Share the interviewer&apos;s audio.
+                </p>
+                <p className="text-slate-400">
+                  Click the button below, pick the meeting <b>tab</b>, and make
+                  sure &quot;Share tab audio&quot; is enabled so the copilot
+                  can hear the conversation.
+                </p>
+                <button
+                  type="button"
+                  onClick={openMeetAndCaptureTab}
+                  className="mt-2 inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-[11px] font-medium text-slate-50 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {tabReady
+                    ? "Interviewer audio shared ✓"
+                    : "Share interviewer’s audio"}
+                </button>
+              </div>
+            </li>
+
+            {/* Step 3 */}
+            <li className="flex gap-3">
+              <div
+                // className={[
+                //   "mt-1 inline-flex h-5 w-5 items-center justify-center rounded-full border text-[11px]",
+                //   step3Done
+                //     ? "border-emerald-400 bg-emerald-500/20 text-emerald-200"
+                //     : "border-slate-600 bg-slate-900 text-slate-600",
+                // ].join(" ")}
+              >
+                {step3Done ? "✓" : ""}
+              </div>
+              <div className="space-y-1">
+                <p className="font-medium text-slate-100">
+                  Share your microphone.
+                </p>
+                <p className="text-slate-400">
+                  Turn on your mic so the copilot can also capture your
+                  comments and follow-up questions.
+                </p>
+                <button
+                  type="button"
+                  onClick={pickMic}
+                  className="mt-2 inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-[11px] font-medium text-slate-50 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {micReady ? "Your mic is on ✓" : "Share your audio"}
+                </button>
+              </div>
+            </li>
+          </ol>
+        </div>
+
+        {/* footer CTA bar with SparkleButton */}
+        <div className="mt-2 flex items-center justify-between border-t border-slate-800 px-6 py-3">
+          <p className="text-[11px] text-slate-400">
+            {/* {allStepsDone
+              ? "All set. You can start the interview now."
+              : "Complete all 3 steps to start the interview."} */}
+          </p>
+          <SparkleButton onClick={startInterview} disabled={!allStepsDone}>
+            Start Interview
+          </SparkleButton>
         </div>
       </div>
     </div>

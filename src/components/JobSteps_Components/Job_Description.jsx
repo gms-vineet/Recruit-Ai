@@ -159,12 +159,12 @@ const openInterview = (interview) => {
                   <span className="block mt-1 text-2xl font-semibold text-gray-500">
                     Today&apos;s Interview is Scheduled
                   </span>
-                  {todayDate && (
+                  {/* {todayDate && (
                     <span className="block mt-1 text-xs text-gray-400">
                       {todayDate} • {todayCount} interview
                       {todayCount === 1 ? "" : "s"}
                     </span>
-                  )}
+                  )} */}
                 </h1>
 
                 {/* status for today's interviews */}

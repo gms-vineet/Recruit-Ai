@@ -1,9 +1,15 @@
+// src/components/ui/SparkleButton.jsx
 import React from "react";
 import styled from "styled-components";
-function SparkleButton({children, onClick}) {
+
+function SparkleButton({ children, onClick, disabled = false }) {
   return (
-    <StyledWrapper>
-      <button className="button" onClick={onClick}>
+    <StyledWrapper data-disabled={disabled}>
+      <button
+        className="button"
+        onClick={disabled ? undefined : onClick}
+        disabled={disabled}
+      >
         <div className="dots_border" />
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -44,28 +50,27 @@ function SparkleButton({children, onClick}) {
 
 const StyledWrapper = styled.div`
   .button {
-    --black-700: hsla(0 0% 12% / 1);    
+    --black-700: hsla(0 0% 12% / 1);
     --border_radius: 9999px;
     --transtion: 0.3s ease-in-out;
-    --offset: 2px;
 
     cursor: pointer;
     position: relative;
 
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.4rem;
 
     transform-origin: center;
 
-    padding: 1rem 2rem;
+    padding: 0.55rem 1.4rem; /* smaller */
     background-color: transparent;
 
     border: none;
     border-radius: var(--border_radius);
     transform: scale(calc(1 + (var(--active, 0) * 0.1)));
 
-    transition: transform var(--transtion);
+    transition: transform var(--transtion), opacity var(--transtion);
   }
 
   .button::before {
@@ -165,16 +170,13 @@ const StyledWrapper = styled.div`
   .button .sparkle {
     position: relative;
     z-index: 10;
-
-    width: 1.75rem;
+    width: 1.35rem; /* smaller icon */
   }
 
   .button .sparkle .path {
     fill: currentColor;
     stroke: currentColor;
-
     transform-origin: center;
-
     color: hsl(0, 0%, 100%);
   }
 
@@ -221,9 +223,18 @@ const StyledWrapper = styled.div`
     );
     background-clip: text;
 
-    font-size: 1rem;
+    font-size: 0.78rem; /* smaller text */
     font-weight: bold;
-    color: #ffff;
+    color: #fff;
+  }
+
+  /* disabled state */
+  &[data-disabled="true"] .button {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  &[data-disabled="true"] .button:is(:hover, :focus-visible) {
+    --active: 0;
   }
 `;
 
