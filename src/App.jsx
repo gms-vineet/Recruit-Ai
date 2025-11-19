@@ -15,6 +15,7 @@ import CandidateDetail from "./pages/CandidateDetail";
 import InterviewRoom from "./pages/InterviewRoom";
 // import Image from "next/image"; // ⬅️ add this
 import InterviewReport from "./pages/InterviewReport";
+import InterviewerFeedback from "./pages/InterviewerFeedback";
 
 export default function App() {
   return (
@@ -26,9 +27,10 @@ export default function App() {
 
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/dashboard" element={<MainContent />} />
-        <Route path="/candidate/:id" element={<CandidateDetail />} /> 
+        <Route path="/interview/:id" element={<CandidateDetail />} /> 
           <Route path="/interview-room" element={<InterviewRoom />} />
           <Route path="/interview/report" element={<InterviewReport />} />
+          <Route path="/interview/feedback" element={<InterviewerFeedback />} />
       </Route>
 
       {/* OPTIONAL: hard-block any accidental redirects to /get-started */}

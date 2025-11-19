@@ -7,7 +7,9 @@ import watchJobList from './../saga/handler/jobDataSaga'
 import watchGetUserData from './../saga/handler/userInfoSaga'
 import watchUploadJD from './../saga/handler/uploadJdSaga'
 import watchResumeParseSaga from './../saga/handler/parseResumeSaga'
-
+import watchtodayInterviewsSaga from "./handler/todayInterviewsSaga";
+import interviewDetailSaga from "./handler/interviewDetailSaga";
+import interviewerInterviewsSaga from "./handler/interviewerInterviewsSaga";
 export default function* rootSaga() {
     yield all([
         watchAuthSaga(),
@@ -16,6 +18,9 @@ export default function* rootSaga() {
         watchJobList(),
         watchGetUserData(),
         watchUploadJD(),
-        watchResumeParseSaga()
+        watchResumeParseSaga(),
+        watchtodayInterviewsSaga(),
+           interviewDetailSaga(), 
+               interviewerInterviewsSaga(),
     ]);
 }

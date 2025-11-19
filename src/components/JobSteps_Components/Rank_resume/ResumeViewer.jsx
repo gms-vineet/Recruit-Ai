@@ -2,8 +2,11 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PreflightModal from "@/components/Modal/PreflightModal";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
+import { updateInterviewStatusRequest } from "../../../store/slices/interviewDetailSlice";
 
+
+const ABSENT_STATUS = "ABSENT";
 /** —— simple renderer for the AI summary —— */
 const RenderAISummary = ({ text }) => {
   if (!text) return null;
@@ -75,7 +78,8 @@ export default function ResumeViewer({ data }) {
   const [showPreflight, setShowPreflight] = useState(false);
   const me = useSelector((s) => s?.auth?.me);
   const interviewerName = me?.interviewer?.name || "Interviewer";
-
+    const { updatingStatus } = useSelector((s) => s?.interviewDetail || {});
+  const dispatch = useDispatch();
   useNavigate(); // kept for parity if you wire navigation later
 
   const getName = (c) =>
@@ -137,6 +141,17 @@ export default function ResumeViewer({ data }) {
     );
   }
 
+const handleMarkAbsent = () => {
+  if (!selected.interview_id) return;
+  dispatch(
+    updateInterviewStatusRequest({
+      interviewId: selected.interview_id,
+      status: ABSENT_STATUS,
+    })
+  );
+};
+  const isAlreadyAbsent = selected.status === ABSENT_STATUS;
+
   return (
     <div className="relative grid h-[85vh] grid-rows-[auto,1fr] w-full overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
       {/* ===== Non-scrolling PROFILE header (short) ===== */}
@@ -156,21 +171,43 @@ export default function ResumeViewer({ data }) {
                 </div>
 
                 {/* RIGHT SIDE: Created + Interview Room button */}
-                <div className="ml-auto flex items-center gap-3">
+                 <div className="ml-auto flex flex-col items-end gap-2">
                   {selected.created_at && (
                     <div className="text-xs text-slate-500 dark:text-slate-400">
-                      Created: {new Date(selected.created_at).toLocaleString()}
+                      Created:{" "}
+                      {new Date(selected.created_at).toLocaleString()}
                     </div>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => setShowPreflight(true)}
-                    className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white shadow hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  >
-                    Interview Room
-                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowPreflight(true)}
+                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white shadow hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    >
+                      Interview Room
+                    </button>
+
+                    {/* NEW BUTTON */}
+                    <button
+                      type="button"
+                      onClick={handleMarkAbsent}
+                      disabled={updatingStatus || isAlreadyAbsent || !selected.interview_id}
+                      className={`rounded-lg px-3 py-1.5 text-sm font-semibold shadow focus:outline-none focus:ring-2 ${
+                        isAlreadyAbsent
+                          ? "bg-slate-400 text-white cursor-default"
+                          : "bg-rose-600 text-white hover:bg-rose-500 focus:ring-rose-400"
+                      } ${updatingStatus ? "opacity-70 cursor-wait" : ""}`}
+                    >
+                      {isAlreadyAbsent
+                        ? "Marked absent"
+                        : updatingStatus
+                        ? "Marking..."
+                        : "Mark as absent"}
+                    </button>
+                  </div>
                 </div>
-              </div>
+                </div>
 
               {/* contact/status row (kept in header for quick glance) */}
               <div className="mt-3">
@@ -383,15 +420,20 @@ export default function ResumeViewer({ data }) {
         </div>
       </main>
 
-      <PreflightModal
-        open={showPreflight}
-        defaultMeet={selected?.meetLink || selected?.meta?.meet_url || ""}
-        interviewerName={interviewerName}
-        candidateName={getName(selected)}
-        jdText={selected?.jd_raw || ""}
-        resumeText={selected?.resume_raw || ""}
-        onClose={() => setShowPreflight(false)}
-      />
+    <PreflightModal
+  open={showPreflight}
+  defaultMeet={
+    selected?.meetLink ||
+    selected?.meet_link ||            // 👈 add this
+    selected?.meta?.meet_url ||
+    ""
+  }
+  interviewerName={interviewerName}
+  candidateName={getName(selected)}
+  jdText={selected?.jd_raw || ""}
+  resumeText={selected?.resume_raw || ""}
+  onClose={() => setShowPreflight(false)}
+/>       
     </div>
   );
 }

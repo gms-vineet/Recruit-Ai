@@ -12,6 +12,9 @@ import rightSidePanelReducer from './slices/UI Slice/panelSlice';
 import createJDReducer from './slices/UI Slice/CreateJDSlice';
 import uploadJDReducer from './slices/uploadJdSlice';
 import resumeParseReducer from './slices/parseResumeSlice';
+import todayInterviewsReducer from "./slices/todayInterviewsSlice"; 
+import interviewDetailReducer from "./slices/interviewDetailSlice";
+import interviewerInterviewsReducer from "./slices/interviewerInterviewsSlice";
 import interviewSessionReducer, {
   saveInterviewSessionToStorage,
 } from "./slices/interviewSessionSlice";
@@ -33,6 +36,9 @@ const store = configureStore({
         createJD:createJDReducer,
         resumeParse:resumeParseReducer,
           interviewSession: interviewSessionReducer, 
+          todayInterviews: todayInterviewsReducer, // 👈 NEW
+            interviewDetail: interviewDetailReducer,
+              interviewerInterviews: interviewerInterviewsReducer,
     },
      middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({  serializableCheck: false,thunk: false }).concat(sagaMiddleware),
