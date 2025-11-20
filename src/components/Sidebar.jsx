@@ -48,8 +48,17 @@ const getStatusBadgeClass = (status) => {
   }
 };
 
-const getStatusLabel = (status) =>
-  (status || "").toUpperCase().replace(/_/g, " ");
+const getStatusLabel = (status) => {
+  const upper = (status || "").toUpperCase();
+
+  // If it starts with "INTERVIEW_", strip that part
+  const withoutPrefix = upper.startsWith("INTERVIEW_")
+    ? upper.replace(/^INTERVIEW_/, "")
+    : upper;
+
+  // Convert remaining underscores to spaces
+  return withoutPrefix.replace(/_/g, " ");
+};
   // JOBS
   const { loading: jobsLoading, jobListData } = useSelector(
     (state) => state.jobList
@@ -253,46 +262,59 @@ const getStatusLabel = (status) =>
                 </div>
               )}
 
-              {candidatesToday.map((c) => (
-                <button
-    key={c.id}
-    onClick={() => handleCandidateCardClick(c)}
-    className={`w-full text-left rounded-lg border border-slate-200/30 dark:border-slate-700/50 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition cursor-pointer ${
-      String(currentCandidateId) === String(c.id)
-        ? "bg-slate-200/60 dark:bg-slate-700/60 ring-1 ring-slate-300 dark:ring-slate-600"
-        : ""
-    }`}
-  >
-    {/* Top row: Name + Status badge on right */}
-    <div className="flex items-center justify-between gap-2">
-      <div className="text-sm font-semibold truncate">
-        {getName(c)}
+        
+      {candidatesToday.map((c) => {
+  const active = String(currentCandidateId) === String(c.id);
+
+  return (
+    <button
+      key={c.id}
+      onClick={() => handleCandidateCardClick(c)}
+      className={`
+          block rounded-md px-3 py-2 my-2 w-full text-start
+          border
+          shadow-[0px_12px_40px_0_rgba(2,6,23,0.3),inset_0_0_120px_rgba(79,70,229,0.08),inset_0px_0px_4px_2px_rgba(255,255,255,0.1)]
+          backdrop-blur-[16px] backdrop-saturate-[180%]
+          transition
+          ${
+            active
+              ? "bg-purple-50 dark:bg-purple-900/40 border-purple-200/70 dark:border-purple-500/40 text-slate-900 dark:text-white"
+              : "bg-slate-50 dark:bg-slate-700 dark:text-white border-[rgba(100,116,139,0.2)] hover:bg-slate-100 dark:hover:bg-slate-600/90"
+          }
+        `}
+      style={{ WebkitBackdropFilter: "blur(16px) saturate(180%)" }}
+    >
+      {/* Top row: Name + Status badge on right */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-sm font-semibold truncate">
+          {getName(c)}
+        </div>
+
+        {c.status && (
+          <span
+            className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${getStatusBadgeClass(
+              c.status
+            )}`}
+          >
+            {getStatusLabel(c.status)}
+          </span>
+        )}
       </div>
 
-      {c.status && (
-        <span
-          className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${getStatusBadgeClass(
-            c.status
-          )}`}
-        >
-          {getStatusLabel(c.status)}
-        </span>
+      {/* Role */}
+      <div className="mt-0.5 text-xs text-slate-500 truncate">
+        {c.role}
+      </div>
+
+      {/* Date & time */}
+      {c.start && (
+        <div className="mt-1 text-[10px] text-slate-500">
+          {fmtDate(c.start)} • {fmtTime(c.start)}
+        </div>
       )}
-    </div>
-
-    {/* Role */}
-    <div className="mt-0.5 text-xs text-slate-500 truncate">
-      {c.role}
-    </div>
-
-    {/* Date & time */}
-    {c.start && (
-      <div className="mt-1 text-[10px] text-slate-500">
-        {fmtDate(c.start)} • {fmtTime(c.start)}
-      </div>
-    )}
-  </button>
-              ))}
+    </button>
+  );
+})}
             </div>
 
             {/* Jobs section */}

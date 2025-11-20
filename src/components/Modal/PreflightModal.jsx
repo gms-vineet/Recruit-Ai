@@ -3,11 +3,15 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import mediaBus, { pipFromStream } from "@/lib/mediaBus";
-import { prepareInterview } from "@/store/slices/interviewSessionSlice";
+import {
+  prepareInterview,
+  bootstrapSessionRequest, // ✅ NEW: import bootstrap action
+} from "@/store/slices/interviewSessionSlice";
 import SparkleButton from "../../components/buttons/SparkleButton"; // adjust if your path is different
 
 export default function PreflightModal({
   open,
+  interviewId,          // ✅ NEW: get interviewId from parent
   defaultMeet = "",
   interviewerName = "Interviewer",
   candidateName = "Candidate",
@@ -23,13 +27,14 @@ export default function PreflightModal({
   const micStreamRef = useRef(null);
   const tabStreamRef = useRef(null);
 
+  // ✅ 1) reset Meet URL whenever modal opens
   useEffect(() => {
     if (open) {
-      // reset from props when modal opens
       setMeetUrl(defaultMeet || "");
     }
   }, [open, defaultMeet]);
 
+  // ✅ 2) STOP streams when modal closes
   useEffect(() => {
     if (!open) {
       try {
@@ -45,6 +50,13 @@ export default function PreflightModal({
     }
   }, [open]);
 
+  // ✅ 3) BOOTSTRAP session when modal opens with an interviewId
+  useEffect(() => {
+    if (open && interviewId) {
+      dispatch(bootstrapSessionRequest({ interviewId }));
+    }
+  }, [open, interviewId, dispatch]); // 🔴 THIS is the snippet you asked about
+
   async function pickMic() {
     try {
       const s = await navigator.mediaDevices.getUserMedia({
@@ -53,7 +65,6 @@ export default function PreflightModal({
       });
       micStreamRef.current = s;
 
-      // 🔄 keep tick in sync if user stops mic sharing
       s.getTracks().forEach((track) => {
         track.onended = () => {
           setMicReady(false);
@@ -107,7 +118,6 @@ export default function PreflightModal({
       alert('No audio captured from the tab. Re-try and enable "Share tab audio".');
     }
 
-    // 🔄 keep tick in sync if user stops screen sharing
     s.getTracks().forEach((track) => {
       track.onended = () => {
         setTabReady(false);
@@ -137,8 +147,10 @@ export default function PreflightModal({
       })
     );
 
+    // ✅ use interviewId prop, not row.interview_id
     navigate("/interview-room", {
       state: {
+        interviewId: interviewId || null,
         autostart: {
           mic: !!micStreamRef.current,
           tab: !!tabStreamRef.current,
@@ -146,15 +158,15 @@ export default function PreflightModal({
         promptMic: false,
       },
     });
+
     onClose?.();
   }
 
   if (!open) return null;
 
-  // 🔹 stepper states
-  const step1Done = !!meetUrl; // meeting link configured
-  const step2Done = tabReady;  // interviewer audio shared
-  const step3Done = micReady;  // mic shared
+  const step1Done = !!meetUrl;
+  const step2Done = tabReady;
+  const step3Done = micReady;
 
   const steps = [
     { id: "s1", label: "Meeting tab", done: step1Done },
@@ -167,7 +179,7 @@ export default function PreflightModal({
   return (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60">
       <div className="w-[560px] max-w-[95vw] rounded-2xl border border-slate-800 bg-slate-950 text-slate-100 shadow-2xl">
-        {/* main header – AI logo removed */}
+        {/* header */}
         <div className="flex items-start justify-between px-6 pt-5 pb-3 border-b border-slate-900/70">
           <div>
             <h2 className="text-sm font-semibold">
@@ -193,7 +205,7 @@ export default function PreflightModal({
           </button>
         </div>
 
-        {/* stepper header (no 1/2/3 numbers, just ticks/dots) */}
+        {/* stepper */}
         <div className="px-6 pt-3 pb-2">
           <div className="mb-2 flex items-center justify-between text-[11px] text-slate-400">
             <span className="uppercase tracking-wide text-[10px] text-slate-500">
@@ -228,21 +240,12 @@ export default function PreflightModal({
           </div>
         </div>
 
-        {/* body with detailed instructions (no 1/2/3 bubbles on left) */}
+        {/* body */}
         <div className="px-6 pb-4 pt-3 text-xs">
           <ol className="space-y-4">
             {/* Step 1 */}
             <li className="flex gap-3">
-              <div
-                // className={[
-                //   "mt-1 inline-flex h-5 w-5 items-center justify-center rounded-full border text-[11px]",
-                //   step1Done
-                //     ? "border-emerald-400 bg-emerald-500/20 text-emerald-200"
-                //     : "border-slate-600 bg-slate-900 text-slate-600",
-                // ].join(" ")}
-              >
-                {/* {step1Done ? "✓" : ""} */}
-              </div>
+              <div />
               <div className="space-y-1">
                 <p className="font-medium text-slate-100">
                   Open your meeting tab.
@@ -262,16 +265,7 @@ export default function PreflightModal({
 
             {/* Step 2 */}
             <li className="flex gap-3">
-              <div
-                // className={[
-                //   "mt-1 inline-flex h-5 w-5 items-center justify-center rounded-full border text-[11px]",
-                //   step2Done
-                //     ? "border-emerald-400 bg-emerald-500/20 text-emerald-200"
-                //     : "border-slate-600 bg-slate-900 text-slate-600",
-                // ].join(" ")}
-              >
-                {step2Done ? "✓" : ""}
-              </div>
+              <div>{step2Done ? "✓" : ""}</div>
               <div className="space-y-1">
                 <p className="font-medium text-slate-100">
                   Share the interviewer&apos;s audio.
@@ -295,16 +289,7 @@ export default function PreflightModal({
 
             {/* Step 3 */}
             <li className="flex gap-3">
-              <div
-                // className={[
-                //   "mt-1 inline-flex h-5 w-5 items-center justify-center rounded-full border text-[11px]",
-                //   step3Done
-                //     ? "border-emerald-400 bg-emerald-500/20 text-emerald-200"
-                //     : "border-slate-600 bg-slate-900 text-slate-600",
-                // ].join(" ")}
-              >
-                {step3Done ? "✓" : ""}
-              </div>
+              <div>{step3Done ? "✓" : ""}</div>
               <div className="space-y-1">
                 <p className="font-medium text-slate-100">
                   Share your microphone.
@@ -325,13 +310,9 @@ export default function PreflightModal({
           </ol>
         </div>
 
-        {/* footer CTA bar with SparkleButton */}
+        {/* footer CTA */}
         <div className="mt-2 flex items-center justify-between border-t border-slate-800 px-6 py-3">
-          <p className="text-[11px] text-slate-400">
-            {/* {allStepsDone
-              ? "All set. You can start the interview now."
-              : "Complete all 3 steps to start the interview."} */}
-          </p>
+          <p className="text-[11px] text-slate-400"></p>
           <SparkleButton onClick={startInterview} disabled={!allStepsDone}>
             Start Interview
           </SparkleButton>

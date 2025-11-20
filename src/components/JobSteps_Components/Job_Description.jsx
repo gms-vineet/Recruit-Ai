@@ -1,4 +1,5 @@
-import React, { useEffect } from "react";
+// src/components/Job_Description.jsx
+import React, { useEffect, useState } from "react";
 import Typewriter from "typewriter-effect";
 import { useDispatch, useSelector } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -16,6 +17,7 @@ import {
 } from "./../../store/slices/UI Slice/CreateJDSlice";
 
 import { fetchTodayInterviewsRequest } from "./../../store/slices/todayInterviewsSlice";
+import { RiCalendarLine } from "@remixicon/react";
 
 // helper: unified display name
 const getName = (c) =>
@@ -35,8 +37,48 @@ const mapInterviewToCard = (iv) => ({
   end: iv.end_at,
   status: iv.status || "INTERVIEW_SCHEDULED",
   meet_link: iv.meet_link,
-  calendar_link: iv.calendar_link,
+  calendar_link: iv.calendar_link, // 👈 already added
 });
+
+/** ---------- Small modal to display Google Calendar event ---------- */
+const CalendarModal = ({ open, url, onClose }) => {
+  if (!open || !url) return null;
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="relative w-[95vw] max-w-4xl h-[80vh] bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+        {/* header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+          <div className="text-sm font-semibold">Interview event in calendar</div>
+          <div className="flex items-center gap-2">
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs px-3 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+            >
+              Open in new tab
+            </a>
+            <button
+              onClick={onClose}
+              className="text-xs px-3 py-1.5 rounded-full border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+
+        {/* iframe */}
+        <iframe
+          src={url}
+          title="Google Calendar Event"
+          className="w-full h-[calc(100%-44px)] border-0"
+          allowFullScreen
+        />
+      </div>
+    </div>
+  );
+};
 
 export default function Job_Description() {
   const dispatch = useDispatch();
@@ -76,10 +118,14 @@ export default function Job_Description() {
     count: todayCount,
   } = useSelector((s) => s?.todayInterviews || {});
 
+  // 🔹 state for calendar modal
+  const [calendarUrl, setCalendarUrl] = useState(null);
+  const [showCalendar, setShowCalendar] = useState(false);
+
   // fetch today interviews on mount
   useEffect(() => {
     dispatch(setCreateNewJD(true)); // your existing behaviour
-    dispatch(fetchTodayInterviewsRequest()); // 👈 NEW
+    dispatch(fetchTodayInterviewsRequest());
   }, [dispatch]);
 
   const { jDSidebar } = location.state || {};
@@ -91,19 +137,19 @@ export default function Job_Description() {
 
   // map API objects to card objects for UI
   const todaysInterviews = apiInterviews.map(mapInterviewToCard);
-const openInterview = (interview) => {
-  // we'll read this in InterviewDetail via useParams
-  navigate(`/interview/${interview.id}`);
-};
+
+  const openInterview = (interview) => {
+    navigate(`/interview/${interview.id}`);
+  };
 
   const Card = (it) => (
     <div
-    key={it.id}
-    onClick={() => openInterview(it)}   // 👈 change here
-    className="rounded-xl border border-slate-200/20 bg-white/70 dark:bg-slate-900/60 backdrop-blur shadow p-4 hover:shadow-md transition-shadow cursor-pointer"
-    role="button"
-    aria-label={`Open ${getName(it)}`}
-  >
+      key={it.id}
+      onClick={() => openInterview(it)}
+      className="rounded-xl border border-slate-200/20 bg-white/70 dark:bg-slate-900/60 backdrop-blur shadow p-4 hover:shadow-md transition-shadow cursor-pointer"
+      role="button"
+      aria-label={`Open ${getName(it)}`}
+    >
       <div className="flex items-center justify-between">
         <div className="font-semibold truncate">{getName(it)}</div>
         <span className="px-2.5 py-1 text-[10px] rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
@@ -124,6 +170,20 @@ const openInterview = (interview) => {
           {fmtTime(it.start)} – {fmtTime(it.end)}
         </span>
       </div>
+
+      {/* 🔹 View in calendar (stops card click) */}
+    {it.calendar_link && (
+  <a
+    href={it.calendar_link}
+    target="_blank"
+    rel="noreferrer"
+    onClick={(e) => e.stopPropagation()} // keep card click from firing
+    className="mt-2 inline-flex items-center gap-1 text-[11px] text-indigo-500 hover:text-indigo-400"
+  >
+    <RiCalendarLine className="h-3 w-3" />
+    <span>View in Calendar</span>
+  </a>
+)}
     </div>
   );
 
@@ -159,12 +219,6 @@ const openInterview = (interview) => {
                   <span className="block mt-1 text-2xl font-semibold text-gray-500">
                     Today&apos;s Interview is Scheduled
                   </span>
-                  {/* {todayDate && (
-                    <span className="block mt-1 text-xs text-gray-400">
-                      {todayDate} • {todayCount} interview
-                      {todayCount === 1 ? "" : "s"}
-                    </span>
-                  )} */}
                 </h1>
 
                 {/* status for today's interviews */}
@@ -174,9 +228,7 @@ const openInterview = (interview) => {
                   </p>
                 )}
                 {todayError && (
-                  <p className="mt-4 text-sm text-red-400">
-                    {todayError}
-                  </p>
+                  <p className="mt-4 text-sm text-red-400">{todayError}</p>
                 )}
                 {!todayLoading &&
                   !todayError &&
@@ -244,6 +296,13 @@ const openInterview = (interview) => {
           )}
         </section>
       )}
+
+      {/* 🔹 Calendar modal at root */}
+      <CalendarModal
+        open={showCalendar}
+        url={calendarUrl}
+        onClose={() => setShowCalendar(false)}
+      />
     </div>
   );
 }

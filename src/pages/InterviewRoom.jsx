@@ -11,6 +11,10 @@ import {
   setValidationData,
   setAISuggestions,
   setSummary,
+  hydrateBootstrapMeta,       // ✅ NEW
+  fetchTurnsRequest,          // ✅ existing saga trigger
+  fetchQuestionsRequest,
+  fetchSummaryRequest,
 } from "@/store/slices/interviewSessionSlice";
 
 const styles = `
@@ -61,7 +65,22 @@ export default function InterviewRoom() {
   const dispatch = useDispatch();
     const navigate = useNavigate(); 
   const interviewSession = useSelector((s) => s.interviewSession);
+  useEffect(() => {
+    if (!interviewSession?.sessionId) return;
 
+    // If your saga needs only count and reads sessionId from state:
+    dispatch(fetchTurnsRequest());
+    dispatch(fetchQuestionsRequest({ count: 5 }));
+
+    // OR, if your saga expects sessionId in payload, use this instead:
+    // dispatch(fetchTurnsRequest({ sessionId: interviewSession.sessionId }));
+    // dispatch(
+    //   fetchQuestionsRequest({
+    //     sessionId: interviewSession.sessionId,
+    //     count: 5,
+    //   })
+    // );
+  }, [interviewSession?.sessionId, dispatch]);
   // NEW: shared promise so /session/start runs only once
   const sessionInitRef = useRef(null);
 
@@ -85,7 +104,7 @@ export default function InterviewRoom() {
     // HTTP base (env or default to Render)
     const BACKEND_HTTP =
       (import.meta?.env?.VITE_BACKEND_HTTP?.replace(/\/$/, "")) ||
-      "https://recruit-meet-ai-4.onrender.com";
+      "https://recruit-ai-9bqm.onrender.com";
 
     // WS base derived from HTTP
     const httpURL = new URL(BACKEND_HTTP);
@@ -186,9 +205,9 @@ export default function InterviewRoom() {
     const micMenu = $("micMenu");
     const micLabelEl = $("micLabel");
 
-    const setStatus = (t) => {
-      if (statusEl) statusEl.textContent = t;
-    };
+    // const setStatus = (t) => {
+    //   if (statusEl) statusEl.textContent = t;
+    // };
 
     function hydrateFromStore() {
       // 1) Validation panel
@@ -309,73 +328,182 @@ export default function InterviewRoom() {
     } catch {}
 
     // ========= SINGLE-FLIGHT SESSION INIT =========
-    async function ensureSession() {
-      // If we already kicked off session init, reuse that promise
-      if (sessionInitRef.current) {
-        return sessionInitRef.current;
-      }
+    // async function ensureSession() {
+    //   // If we already kicked off session init, reuse that promise
+    //   if (sessionInitRef.current) {
+    //     return sessionInitRef.current;
+    //   }
+
+    //   sessionInitRef.current = (async () => {
+    //     // 1) Ensure we have a local sessionId
+    //     if (!metaRef.current.sessionId) {
+    //       const newId = `MEET-${Math.random().toString(36).slice(2, 9)}`;
+    //       metaRef.current.sessionId = newId;
+    //       dispatch(setInterviewSessionId(newId));
+    //       dispatch(setInterviewStatus("active"));
+    //     }
+
+    //     // 2) Try to register/start that session on the backend
+    //     try {
+    //       const body = {
+    //         meeting_id: metaRef.current.sessionId,
+    //         interviewer_name: metaRef.current.interviewer || "",
+    //         candidate_name: metaRef.current.candidate || "",
+    //         jd: metaRef.current.jd || "",
+    //         resume: metaRef.current.resume || "",
+    //         meet_url: metaRef.current.meetUrl || "",
+    //       };
+
+    //       const r = await fetchWithTimeout(`${BACKEND_HTTP}/session/start`, {
+    //         method: "POST",
+    //         headers: { "Content-Type": "application/json" },
+    //         body: JSON.stringify(body),
+    //       });
+
+    //       if (r.ok) {
+    //         let data = null;
+    //         try {
+    //           data = await r.json();
+    //         } catch {}
+
+    //         if (data) {
+    //           metaRef.current.interviewer =
+    //             data.interviewer_name ?? metaRef.current.interviewer;
+    //           metaRef.current.candidate =
+    //             data.candidate_name ?? metaRef.current.candidate;
+    //           metaRef.current.jd = data.jd ?? metaRef.current.jd;
+    //           metaRef.current.resume = data.resume ?? metaRef.current.resume;
+    //           metaRef.current.meetUrl =
+    //             data.meet_url ?? metaRef.current.meetUrl;
+    //         }
+
+    //         setStatus(`session ${metaRef.current.sessionId} ready`);
+    //         dispatch(setInterviewError(null));
+    //       } else {
+    //         const msg = `session/start failed (${r.status})`;
+    //         setStatus(msg);
+    //         dispatch(setInterviewError(msg));
+    //       }
+    //     } catch (err) {
+    //       const msg =
+    //         err?.name === "AbortError"
+    //           ? "session/start timed out"
+    //           : err?.message ||
+    //             `session ${metaRef.current.sessionId} (offline)`;
+    //       setStatus(msg);
+    //       dispatch(setInterviewError(msg));
+    //     }
+
+    //     return metaRef.current.sessionId;
+    //   })();
+
+    //   return sessionInitRef.current;
+    // }
+        const setStatus = (t) => {
+      if (statusEl) statusEl.textContent = t;
+    };
+   async function ensureSession() {
+      if (sessionInitRef.current) return sessionInitRef.current;
 
       sessionInitRef.current = (async () => {
-        // 1) Ensure we have a local sessionId
-        if (!metaRef.current.sessionId) {
-          const newId = `MEET-${Math.random().toString(36).slice(2, 9)}`;
-          metaRef.current.sessionId = newId;
-          dispatch(setInterviewSessionId(newId));
+        const interviewId =
+          interviewSession?.interviewId || state?.interviewId || null;
+
+        // If we already have a sessionId (from Preflight bootstrap), just reuse it
+        if (metaRef.current.sessionId) {
           dispatch(setInterviewStatus("active"));
+          return metaRef.current.sessionId;
         }
 
-        // 2) Try to register/start that session on the backend
+        // If we somehow don't have interviewId (direct URL hit),
+        // fall back to a local-only session so nothing calls backend with "".
+        if (!interviewId) {
+          const fallback = `MEET-${Math.random().toString(36).slice(2, 9)}`;
+          metaRef.current.sessionId = fallback;
+          dispatch(setInterviewSessionId(fallback));
+          dispatch(setInterviewStatus("active"));
+          setStatus(`local session ${fallback} (no interviewId)`);
+          return fallback;
+        }
+
         try {
-          const body = {
-            meeting_id: metaRef.current.sessionId,
-            interviewer_name: metaRef.current.interviewer || "",
-            candidate_name: metaRef.current.candidate || "",
-            jd: metaRef.current.jd || "",
-            resume: metaRef.current.resume || "",
-            meet_url: metaRef.current.meetUrl || "",
-          };
+          const body = { interview_id: interviewId };
 
-          const r = await fetchWithTimeout(`${BACKEND_HTTP}/session/start`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          });
-
-          if (r.ok) {
-            let data = null;
-            try {
-              data = await r.json();
-            } catch {}
-
-            if (data) {
-              metaRef.current.interviewer =
-                data.interviewer_name ?? metaRef.current.interviewer;
-              metaRef.current.candidate =
-                data.candidate_name ?? metaRef.current.candidate;
-              metaRef.current.jd = data.jd ?? metaRef.current.jd;
-              metaRef.current.resume = data.resume ?? metaRef.current.resume;
-              metaRef.current.meetUrl =
-                data.meet_url ?? metaRef.current.meetUrl;
+          const r = await fetchWithTimeout(
+            `${BACKEND_HTTP}/meet/session/bootstrap`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
             }
+          );
 
-            setStatus(`session ${metaRef.current.sessionId} ready`);
-            dispatch(setInterviewError(null));
-          } else {
-            const msg = `session/start failed (${r.status})`;
+          if (!r.ok) {
+            const msg = `session bootstrap failed (${r.status})`;
             setStatus(msg);
             dispatch(setInterviewError(msg));
+            return metaRef.current.sessionId || "";
           }
+
+          const data = await r.json();
+
+          const sid =
+            data.session_id ||
+            data.sessionId ||
+            metaRef.current.sessionId ||
+            `MEET-${Math.random().toString(36).slice(2, 9)}`;
+
+          metaRef.current.sessionId = sid;
+          metaRef.current.meetingId =
+            data.meeting_id ||
+            data.meetingId ||
+            metaRef.current.meetingId ||
+            sid;
+
+          metaRef.current.interviewer =
+            data.interviewer_name ||
+            data.interviewer ||
+            metaRef.current.interviewer;
+          metaRef.current.candidate =
+            data.candidate_name ||
+            data.candidate ||
+            metaRef.current.candidate;
+          metaRef.current.jd = data.jd ?? metaRef.current.jd;
+          metaRef.current.resume = data.resume ?? metaRef.current.resume;
+          metaRef.current.meetUrl = data.meet_url ?? metaRef.current.meetUrl;
+
+          dispatch(setInterviewSessionId(sid));
+          dispatch(setInterviewStatus("active"));
+          dispatch(setInterviewError(null));
+
+          // keep Redux in sync
+          dispatch(
+            hydrateBootstrapMeta({
+              interviewId:
+                interviewId ||
+                data.interview_id ||
+                interviewSession?.interviewId,
+              sessionId: sid,
+              meetingId: metaRef.current.meetingId,
+              interviewerName: metaRef.current.interviewer,
+              candidateName: metaRef.current.candidate,
+              jd: metaRef.current.jd,
+              resume: metaRef.current.resume,
+              meetUrl: metaRef.current.meetUrl,
+            })
+          );
+
+          setStatus(`session ${sid} ready`);
+          return sid;
         } catch (err) {
           const msg =
             err?.name === "AbortError"
-              ? "session/start timed out"
-              : err?.message ||
-                `session ${metaRef.current.sessionId} (offline)`;
+              ? "session bootstrap timed out"
+              : err?.message || "session bootstrap error";
           setStatus(msg);
           dispatch(setInterviewError(msg));
+          return metaRef.current.sessionId || "";
         }
-
-        return metaRef.current.sessionId;
       })();
 
       return sessionInitRef.current;
@@ -880,6 +1008,10 @@ export default function InterviewRoom() {
     // Load stored transcript turns (GET /session/{id}/turns)
     async function loadTurns() {
       const id = await ensureSession();
+      if (!id) {
+        console.warn("No sessionId – skipping /session/{id}/turns");
+        return;
+      }
       try {
         const r = await fetchWithTimeout(
           `${BACKEND_HTTP}/session/${encodeURIComponent(id)}/turns`,
@@ -1042,39 +1174,29 @@ export default function InterviewRoom() {
       micBodyHandler();
     };
 
-    const tabClickHandler = async () => {
-      if (tabActive()) {
-        stopTab();
-      } else {
-        await startTab();
-      }
-    };
-   const stopClickHandler = async () => {
-  // 1) Stop all audio / streams / PiP / Meet tab
+const tabClickHandler = async () => {
+  if (tabActive()) {
+    stopTab();
+  } else {
+    await startTab();
+  }
+};
+
+// ✅ NEW: summary via saga instead of manual fetch
+const stopClickHandler = () => {
+  // Stop streams + PiP + Meet tab
   stopAll();
 
-  // 2) Ensure session id exists
-  await ensureSession();
-  const sid = metaRef.current.sessionId;
-
-  // 3) Generate summary for this session and persist in Redux
-  try {
-    const data = await postJSON(`${BACKEND_HTTP}/ai/summary`, {
-      session_id: sid,
-    });
-    dispatch(setSummary(data));
-  } catch (e) {
-    console.warn("summary generation failed on Exit:", e);
-    // You could optionally store an error in Redux here
+  // Let saga call /ai/summary using sessionId from Redux
+  if (interviewSession?.sessionId) {
+    dispatch(fetchSummaryRequest());
   }
 
-  // 4) Mark the session as ended (we KEEP summary + sessionId)
+  // Mark session as ended (you can also keep this inside saga if you prefer)
   dispatch(endInterviewSession());
 
-  // 5) Navigate to the Report page
-  navigate("/interview/report", {
-    state: { sessionId: sid }, // optional; report can also read from Redux
-  });
+  // Simple navigation; report page will read summary from Redux
+  navigate("/interview/report");
 };
     const getQsHandler = () => getQs(false);
     const moreQsHandler = () => getQs(true);

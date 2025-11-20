@@ -9,7 +9,7 @@ import AiLoader from "../components/Loaders/AiLoader";
 import {
   fetchInterviewDetailRequest,
   resetInterviewDetail,
-} from "../store/slices/interviewDetailSlice";
+} from "@/store/slices/interviewDetailSlice";
 
 import { RiArrowLeftLine } from "@remixicon/react";
 
@@ -18,12 +18,12 @@ export default function CandidateDetail() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  // ---- unify slice shape (supports { data: {...} } or flat state) ----
   const detailState = useSelector((s) => s?.interviewDetail || {});
   const loading = detailState.loading;
   const error = detailState.error;
 
-  const root = detailState.data || detailState; // if your reducer kept everything in state.data
+  // support both { data: {...} } and flat
+  const root = detailState.data || detailState;
 
   const interview = root.interview || detailState.interview;
   const job = root.job || detailState.job;
@@ -47,6 +47,7 @@ export default function CandidateDetail() {
 
     const merged = { ...resume };
 
+    // Ensure interview_id from /interview is available to ResumeViewer/Preflight
     if (interview?.interview_id) {
       merged.interview_id = interview.interview_id;
     }
@@ -79,7 +80,7 @@ export default function CandidateDetail() {
     if (interview) {
       merged.status = merged.status || interview.status;
 
-      // keep both meetLink + meet_link so old code keeps working
+      // keep both meetLink + meet_link so older code keeps working
       merged.meet_link = merged.meet_link || interview.meet_link;
       merged.meetLink = merged.meetLink || interview.meet_link;
 
@@ -91,7 +92,7 @@ export default function CandidateDetail() {
     merged.ai_summary =
       merged.ai_summary || aiSummary || resume.ai_summary || "";
 
-    // meta used by PreflightModal
+    // meta used by PreflightModal as fallback for meet URL
     merged.meta = {
       ...(resume.meta || {}),
       meet_url:
@@ -129,7 +130,6 @@ export default function CandidateDetail() {
     );
   }
 
-  // If API returned 200 but no resume object
   if (!resume) {
     return (
       <div className="max-w-6xl mx-auto px-4 ra-scroll py-6">

@@ -1,8 +1,9 @@
 // src/pages/InterviewerFeedback.jsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-// import { setInterviewerFeedback } from "@/store/slices/interviewSessionSlice";
+import { submitFeedbackRequest } from "@/store/slices/interviewFeedbackSlice";
+import { updateInterviewStatusRequest } from "../store/slices/interviewDetailSlice";
 
 const styles = `
   /* --- Layout wrapper --- */
@@ -21,7 +22,7 @@ const styles = `
   .fb-card {
     width: 100%;
     border-radius: 18px;
-    border: 1px solid rgba(148, 163, 184, 0.45); /* slate-400 */
+    border: 1px solid rgba(148, 163, 184, 0.45);
     background:
       radial-gradient(140% 200% at 0% 0%,
         rgba(56, 189, 248, 0.14),
@@ -54,7 +55,7 @@ const styles = `
 
   .fb-card .subtitle {
     font-size: 13px;
-    color: #9ca3af; /* slate-400 */
+    color: #9ca3af;
     margin: 0;
   }
 
@@ -86,7 +87,7 @@ const styles = `
 
   .fb-card .section {
     padding: 10px 0;
-    border-top: 1px solid rgba(30, 41, 59, 0.9); /* slate-800 */
+    border-top: 1px solid rgba(30, 41, 59, 0.9);
   }
 
   .fb-card .section:first-of-type {
@@ -105,7 +106,7 @@ const styles = `
 
   .fb-card .section-hint {
     font-size: 12px;
-    color: #94a3b8; /* slate-400/500 */
+    color: #94a3b8;
     margin-bottom: 8px;
   }
 
@@ -129,7 +130,7 @@ const styles = `
     gap: 6px;
     padding: 6px 11px;
     border-radius: 999px;
-    border: 1px solid rgba(51, 65, 85, 0.9); /* slate-700 */
+    border: 1px solid rgba(51, 65, 85, 0.9);
     background: radial-gradient(circle at top,
       rgba(15, 23, 42, 0.8),
       rgba(15, 23, 42, 1)
@@ -165,7 +166,7 @@ const styles = `
 
   .fb-card .scale-label {
     font-size: 11px;
-    color: #64748b; /* slate-500 */
+    color: #64748b;
     margin-top: 4px;
   }
 
@@ -181,7 +182,7 @@ const styles = `
     width: 100%;
     min-height: 90px;
     border-radius: 10px;
-    border: 1px solid rgba(51, 65, 85, 1); /* slate-700 */
+    border: 1px solid rgba(51, 65, 85, 1);
     padding: 8px 11px;
     font-size: 13px;
     resize: vertical;
@@ -251,12 +252,38 @@ const styles = `
     }
   }
 `;
+const RECOMMENDATION_MAP = {
+  strong_hire: "STRONG_HIRE",
+  hire: "HIRE",
+  not_sure: "NOT_SURE",
+  no_hire: "DO_NOT_HIRE",
+};
 
+const SKILLS_MAP = {
+  low: "LOW",
+  medium: "MEDIUM",
+  high: "HIGH",
+};
+
+const COMM_MAP = {
+  needs_work: "NEEDS_WORK",
+  okay: "OKAY",
+  strong: "STRONG",
+};
+
+const JD_MAP = {
+  perfect_fit: "PERFECT",
+  good_fit: "GOOD",
+  uncertain: "UNCERTAIN",
+};
 export default function InterviewerFeedback() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { state } = useLocation() || {};
   const interviewSession = useSelector((s) => s.interviewSession);
+  const feedbackState = useSelector((s) => s.interviewFeedback);
+
+  const { submitting, error, lastFeedback } = feedbackState;
 
   const sessionId =
     state?.sessionId || interviewSession.sessionId || "—";
@@ -266,6 +293,19 @@ export default function InterviewerFeedback() {
     state?.interviewerName || interviewSession.interviewerName || "Interviewer";
   const jobTitle =
     state?.jobTitle || interviewSession.jobTitle || "Interview Feedback";
+
+  // 🔹 interviewId + duration coming from Report page or Redux
+  const interviewId =
+    state?.interviewId ||
+    interviewSession.interviewId ||
+    interviewSession.summary?.interview_id ||
+    null;
+
+  const duration =
+    state?.duration ||
+    interviewSession.duration ||
+    interviewSession.summary?.duration ||
+    "—";
 
   // form state
   const [recommendation, setRecommendation] = useState("");
@@ -281,7 +321,7 @@ export default function InterviewerFeedback() {
     );
   };
 
-  // scores out of 10 (2 / 5 / 8 mapping)
+  // scores (for UI info only)
   const skillsMatchScore =
     skillsMatch === "low"
       ? 2
@@ -302,42 +342,68 @@ export default function InterviewerFeedback() {
 
   const jdAlignmentScore =
     jdAlignment === "uncertain"
-      ? 2        // treat uncertain as low
+      ? 2
       : jdAlignment === "good_fit"
       ? 5
       : jdAlignment === "perfect_fit"
       ? 8
       : 0;
 
-  const handleSubmit = (e) => {
+ const handleSubmit = (e) => {
     e.preventDefault();
 
-    const analytics = {
-      skills_match_score: skillsMatchScore,
-      communication_score: communicationScore,
-      jd_alignment_score: jdAlignmentScore,
-    };
+    if (!interviewId) {
+      alert("Missing interview id. Please go back to the report and try again.");
+      return;
+    }
+
+    if (!recommendation || !skillsMatch || !communication || !jdAlignment) {
+      alert("Please fill all rating fields before submitting.");
+      return;
+    }
+
+    // ---- build body exactly like Swagger example ----
+    const flagsObject = flags.reduce((acc, key) => {
+      acc[key] = true;
+      return acc;
+    }, {});
 
     const payload = {
-      sessionId,
-      candidateName,
-      interviewerName,
-      jobTitle,
-      recommendation, // no numeric calc for this
-      skillsMatch,
-      communication,
-      jdAlignment,
-      flags,
-      comments,
-      analytics,
-      createdAt: new Date().toISOString(),
+      overall_recommendation: RECOMMENDATION_MAP[recommendation],
+      skills_level: SKILLS_MAP[skillsMatch],
+      communication_level: COMM_MAP[communication],
+      jd_fit_level: JD_MAP[jdAlignment],
+      flags: flagsObject,
+      comment: comments || "",
     };
 
-    // dispatch(setInterviewerFeedback(payload)); // when you wire redux
-    console.log("Interviewer feedback:", payload);
-    alert("Feedback saved (check console / Redux).");
-    navigate("/dashboard");
+    dispatch(
+      submitFeedbackRequest({
+        interviewId,
+        payload, // 👈 saga will send this as request body
+      })
+    );
+      dispatch(
+    updateInterviewStatusRequest({
+      interviewId,
+      status: "INTERVIEW_DONE",
+    })
+  );
   };
+  // Navigate on success
+  useEffect(() => {
+    if (!submitting && lastFeedback) {
+      navigate("/dashboard");
+    }
+  }, [submitting, lastFeedback, navigate]);
+
+  // Show error (you can replace with toast)
+  useEffect(() => {
+    if (error) {
+      console.error("Feedback error:", error);
+      alert(error);
+    }
+  }, [error]);
 
   return (
     <div className="fb-wrapper">
@@ -349,7 +415,7 @@ export default function InterviewerFeedback() {
           <p className="subtitle">
             Quick check-boxes + one comment. This helps with fair, consistent analysis.
           </p>
-          <div className="meta-row">
+          {/* <div className="meta-row">
             <span className="meta-pill">
               <strong>Candidate:</strong> {candidateName}
             </span>
@@ -359,11 +425,21 @@ export default function InterviewerFeedback() {
             <span className="meta-pill">
               <strong>Session:</strong> {sessionId}
             </span>
-          </div>
+            {interviewId && (
+              <span className="meta-pill">
+                <strong>Interview ID:</strong> {interviewId}
+              </span>
+            )}
+            {duration && (
+              <span className="meta-pill">
+                <strong>Duration:</strong> {duration}
+              </span>
+            )}
+          </div> */}
         </div>
 
         <div className="fb-grid">
-          {/* Overall recommendation – no numeric calc */}
+          {/* Overall recommendation */}
           <div className="section">
             <div className="section-title">Overall recommendation</div>
             <p className="section-hint">
@@ -398,7 +474,7 @@ export default function InterviewerFeedback() {
                   checked={recommendation === "not_sure"}
                   onChange={(e) => setRecommendation(e.target.value)}
                 />
-                <span>Not sure / need another round</span>
+                <span>Need another round / Assignment</span>
               </label>
               <label className="tick-option">
                 <input
@@ -454,9 +530,7 @@ export default function InterviewerFeedback() {
             <div className="scale-label">
               Score mapping: Low = 2, Medium = 5, High = 8
             </div>
-            <div className="score-label">
-              Marks: {skillsMatchScore}/10
-            </div>
+            <div className="score-label">Marks: {skillsMatchScore}/10</div>
           </div>
 
           {/* Communication */}
@@ -502,9 +576,7 @@ export default function InterviewerFeedback() {
             <div className="scale-label">
               Score mapping: Needs work = 2, Okay = 5, Strong = 8
             </div>
-            <div className="score-label">
-              Marks: {communicationScore}/10
-            </div>
+            <div className="score-label">Marks: {communicationScore}/10</div>
           </div>
 
           {/* JD alignment */}
@@ -548,15 +620,15 @@ export default function InterviewerFeedback() {
             <div className="scale-label">
               Score mapping: Uncertain = 2, Good = 5, Perfect = 8
             </div>
-            <div className="score-label">
-              Marks: {jdAlignmentScore}/10
-            </div>
+            <div className="score-label">Marks: {jdAlignmentScore}/10</div>
           </div>
 
           {/* Flags */}
-          <div className="section section-full">
+          {/* <div className="section section-full">
             <div className="section-title">Anything you noticed?</div>
-            <p className="section-hint">Tick anything that applies (optional).</p>
+            <p className="section-hint">
+              Tick anything that applies (optional).
+            </p>
             <div className="options-row">
               <label className="tick-option">
                 <input
@@ -599,7 +671,7 @@ export default function InterviewerFeedback() {
                 <span>Limited data (short interview / few answers)</span>
               </label>
             </div>
-          </div>
+          </div> */}
 
           {/* Comments */}
           <div className="section section-full">
@@ -619,8 +691,12 @@ export default function InterviewerFeedback() {
 
         <div className="footer">
           <span className="hint-small">Takes ~30 seconds to complete.</span>
-          <button type="submit" className="btn btn-primary">
-            Save feedback
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={submitting}
+          >
+            {submitting ? "Saving..." : "Save feedback"}
           </button>
         </div>
       </form>

@@ -17,7 +17,11 @@ function fmtTime(iso) {
 }
 function fmtDate(iso) {
   const d = new Date(iso);
-  return d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+  return d.toLocaleDateString([], {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export default function TodayInterviewCard({ data, onStart }) {
@@ -34,7 +38,12 @@ export default function TodayInterviewCard({ data, onStart }) {
     end,
     resumeUrl,
     status,
+    calendarLink,
+    calendar_link, // in case API sends snake_case
   } = data || {};
+
+  // prefer camelCase but support snake_case
+  const calendarHref = calendarLink || calendar_link;
 
   return (
     <div className="w-full rounded-2xl border border-slate-200/20 bg-white/70 dark:bg-slate-900/60 backdrop-blur shadow-lg p-5 hover:shadow-xl transition-shadow">
@@ -64,7 +73,9 @@ export default function TodayInterviewCard({ data, onStart }) {
             <RiBriefcase2Line className="h-4 w-4 text-slate-400" />
             <span className="font-medium">{role}</span>
           </div>
-          <div className="text-xs text-slate-500 dark:text-slate-400">Experience: {experience}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            Experience: {experience}
+          </div>
 
           <div className="mt-2 flex flex-wrap gap-2">
             {skills.slice(0, 6).map((s) => (
@@ -83,12 +94,28 @@ export default function TodayInterviewCard({ data, onStart }) {
             <RiCalendarLine className="h-4 w-4 text-slate-400" />
             <span>{fmtDate(start)}</span>
           </div>
+
           <div className="flex items-center gap-2 text-sm">
             <RiTimeLine className="h-4 w-4 text-slate-400" />
             <span>
               {fmtTime(start)} – {fmtTime(end)}
             </span>
           </div>
+
+          {/* 🔹 Calendar icon → opens GCal in new tab */}
+          {calendarHref && (
+            <a
+              href={calendarHref}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 text-xs text-indigo-500 hover:text-indigo-400"
+            >
+              <RiCalendarLine className="h-4 w-4" />
+              <span>View in Calendar</span>
+              <RiExternalLinkLine className="h-3 w-3" />
+            </a>
+          )}
+
           <div className="flex items-center gap-2 text-sm">
             {mode === "Video" ? (
               <>

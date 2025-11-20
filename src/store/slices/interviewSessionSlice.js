@@ -4,7 +4,11 @@ import { createSlice } from "@reduxjs/toolkit";
 const STORAGE_KEY = "interviewSession";
 
 const baseDefaults = {
+  // IDs / meta
+  interviewId: null,
   sessionId: null,
+  meetingId: null,
+
   interviewerName: null,
   candidateName: null,
   jd: "",
@@ -13,11 +17,22 @@ const baseDefaults = {
   status: "idle", // "idle" | "active" | "ended" | "error"
   error: null,
 
-  // UI / report state to persist
+  // transcript history (GET /session/{id}/turns)
+  turns: [],
+
+  // validation & AI helper state
   // { question, expectedAnswer, verdict, score, explanation, candidateAnswer }
   validation: null,
   aiSuggestions: [], // string[]
-  summary: null, // summary object from /ai/summary
+  summary: null, // object from /ai/summary
+
+  // loading flags for saga-driven APIs
+  loadingBootstrap: false,
+  loadingTurns: false,
+  loadingQuestions: false,
+  loadingSummary: false,
+  loadingExpected: false,
+  loadingValidate: false,
 };
 
 const loadInitial = () => {
@@ -26,7 +41,6 @@ const loadInitial = () => {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return baseDefaults;
     const stored = JSON.parse(raw);
-    // merge so new fields always exist
     return { ...baseDefaults, ...stored };
   } catch {
     return baseDefaults;
@@ -39,28 +53,36 @@ const interviewSessionSlice = createSlice({
   name: "interviewSession",
   initialState,
   reducers: {
-    /** Called in Preflight before navigation */
+    // called from Preflight before navigation
     prepareInterview(state, action) {
-      const { interviewerName, candidateName, jd, resume, meetUrl } =
-        action.payload || {};
+      const {
+        interviewerName,
+        candidateName,
+        jd,
+        resume,
+        meetUrl,
+        interviewId,
+      } = action.payload || {};
+
       state.interviewerName = interviewerName || "Interviewer";
       state.candidateName = candidateName || "Candidate";
       state.jd = jd || "";
       state.resume = resume || "";
       state.meetUrl = meetUrl || "";
+      state.interviewId = interviewId || state.interviewId || null;
       state.error = null;
 
-      // Starting a fresh interview → clear old per-interview state
+      // fresh interview – clear per-interview state
       state.validation = null;
       state.aiSuggestions = [];
       state.summary = null;
+      state.turns = [];
       state.status = "idle";
-      // NOTE: we do NOT touch sessionId here; it will be created in InterviewRoom
+      // sessionId & meetingId will be created in InterviewRoom/bootstrap
     },
 
-    /** Set / lock the meeting_id for the active interview. */
     setInterviewSessionId(state, action) {
-      state.sessionId = action.payload;
+      state.sessionId = action.payload || null;
       if (action.payload) state.status = "active";
     },
 
@@ -70,21 +92,40 @@ const interviewSessionSlice = createSlice({
 
     setInterviewError(state, action) {
       state.error = action.payload || null;
+      if (state.error) state.status = "error";
     },
 
-    /** Called when user presses Exit */
     endInterviewSession(state) {
-      // We KEEP sessionId + summary so the Report page can read them.
       state.status = "ended";
-      // Don't clear validation/aiSuggestions either – they might be useful later.
     },
 
-    /** Full reset – rarely used, but handy */
     resetInterviewSession() {
       return { ...baseDefaults };
     },
 
-    // 🔹 Persist Validation / Suggestions / Summary
+    // hydrate meta coming back from /meet/session/bootstrap
+    hydrateBootstrapMeta(state, action) {
+      const {
+        interviewId,
+        sessionId,
+        meetingId,
+        interviewerName,
+        candidateName,
+        jd,
+        resume,
+        meetUrl,
+      } = action.payload || {};
+
+      if (interviewId) state.interviewId = interviewId;
+      if (sessionId) state.sessionId = sessionId;
+      if (meetingId) state.meetingId = meetingId;
+      if (interviewerName) state.interviewerName = interviewerName;
+      if (candidateName) state.candidateName = candidateName;
+      if (typeof jd === "string") state.jd = jd;
+      if (typeof resume === "string") state.resume = resume;
+      if (typeof meetUrl === "string") state.meetUrl = meetUrl;
+    },
+
     setValidationData(state, action) {
       state.validation = action.payload || null;
     },
@@ -97,6 +138,128 @@ const interviewSessionSlice = createSlice({
 
     setSummary(state, action) {
       state.summary = action.payload || null;
+    },
+
+    setTurns(state, action) {
+      state.turns = Array.isArray(action.payload) ? action.payload : [];
+    },
+
+    // ---------------- SAGA TRIGGERS ----------------
+
+    // 1) /meet/session/bootstrap
+    bootstrapSessionRequest(state) {
+      state.loadingBootstrap = true;
+      state.error = null;
+    },
+    bootstrapSessionSuccess(state, action) {
+      state.loadingBootstrap = false;
+      const {
+        interview_id,
+        session_id,
+        meeting_id,
+        interviewer_name,
+        candidate_name,
+        jd,
+        resume,
+        meet_url,
+      } = action.payload || {};
+
+      state.interviewId = interview_id ?? state.interviewId;
+      state.sessionId = session_id ?? state.sessionId;
+      state.meetingId = meeting_id ?? state.meetingId;
+      state.interviewerName =
+        interviewer_name || state.interviewerName || "Interviewer";
+      state.candidateName =
+        candidate_name || state.candidateName || "Candidate";
+      if (typeof jd === "string") state.jd = jd;
+      if (typeof resume === "string") state.resume = resume;
+      if (typeof meet_url === "string") state.meetUrl = meet_url;
+      state.status = "active";
+    },
+    bootstrapSessionFailure(state, action) {
+      state.loadingBootstrap = false;
+      state.error = action.payload || "Unable to bootstrap MeetAI session";
+      state.status = "error";
+    },
+
+    // 2) GET /session/{id}/turns
+    fetchTurnsRequest(state) {
+      state.loadingTurns = true;
+    },
+    fetchTurnsSuccess(state, action) {
+      state.loadingTurns = false;
+      state.turns = Array.isArray(action.payload) ? action.payload : [];
+    },
+    fetchTurnsFailure(state, action) {
+      state.loadingTurns = false;
+      state.error = action.payload || "Unable to load transcript";
+    },
+
+    // 3) POST /ai/questions
+    fetchQuestionsRequest(state) {
+      state.loadingQuestions = true;
+    },
+    fetchQuestionsSuccess(state, action) {
+      state.loadingQuestions = false;
+      state.aiSuggestions = Array.isArray(action.payload)
+        ? action.payload
+        : [];
+    },
+    fetchQuestionsFailure(state, action) {
+      state.loadingQuestions = false;
+      state.error = action.payload || "Unable to load AI questions";
+    },
+
+    // 4) POST /ai/expected
+    fetchExpectedRequest(state) {
+      state.loadingExpected = true;
+    },
+    fetchExpectedSuccess(state, action) {
+      state.loadingExpected = false;
+      const { question, expectedAnswer } = action.payload || {};
+      state.validation = {
+        ...(state.validation || {}),
+        question: question ?? state.validation?.question ?? "",
+        expectedAnswer: expectedAnswer ?? "",
+      };
+    },
+    fetchExpectedFailure(state, action) {
+      state.loadingExpected = false;
+      state.error = action.payload || "Unable to fetch expected answer";
+    },
+
+    // 5) POST /ai/validate
+    fetchValidateRequest(state) {
+      state.loadingValidate = true;
+    },
+    fetchValidateSuccess(state, action) {
+      state.loadingValidate = false;
+      const { verdict, score, explanation, candidateAnswer } =
+        action.payload || {};
+      state.validation = {
+        ...(state.validation || {}),
+        verdict: verdict ?? null,
+        score: typeof score === "number" ? score : null,
+        explanation: explanation ?? "",
+        candidateAnswer: candidateAnswer ?? "",
+      };
+    },
+    fetchValidateFailure(state, action) {
+      state.loadingValidate = false;
+      state.error = action.payload || "Unable to validate answer";
+    },
+
+    // 6) POST /ai/summary
+    fetchSummaryRequest(state) {
+      state.loadingSummary = true;
+    },
+    fetchSummarySuccess(state, action) {
+      state.loadingSummary = false;
+      state.summary = action.payload || null;
+    },
+    fetchSummaryFailure(state, action) {
+      state.loadingSummary = false;
+      state.error = action.payload || "Unable to generate summary";
     },
   },
 });
@@ -111,17 +274,43 @@ export const {
   setValidationData,
   setAISuggestions,
   setSummary,
+  setTurns,
+  hydrateBootstrapMeta,
+
+  bootstrapSessionRequest,
+  bootstrapSessionSuccess,
+  bootstrapSessionFailure,
+
+  fetchTurnsRequest,
+  fetchTurnsSuccess,
+  fetchTurnsFailure,
+
+  fetchQuestionsRequest,
+  fetchQuestionsSuccess,
+  fetchQuestionsFailure,
+
+  fetchExpectedRequest,
+  fetchExpectedSuccess,
+  fetchExpectedFailure,
+
+  fetchValidateRequest,
+  fetchValidateSuccess,
+  fetchValidateFailure,
+
+  fetchSummaryRequest,
+  fetchSummarySuccess,
+  fetchSummaryFailure,
 } = interviewSessionSlice.actions;
 
 export default interviewSessionSlice.reducer;
 
-// helper used in store.subscribe()
+// persist slice to localStorage
 export const saveInterviewSessionToStorage = (state) => {
   if (typeof window === "undefined") return;
   try {
     const slice = state.interviewSession;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(slice));
   } catch {
-    // ignore storage errors
+    // ignore
   }
 };

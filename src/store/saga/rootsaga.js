@@ -10,6 +10,8 @@ import watchResumeParseSaga from './../saga/handler/parseResumeSaga'
 import watchtodayInterviewsSaga from "./handler/todayInterviewsSaga";
 import interviewDetailSaga from "./handler/interviewDetailSaga";
 import interviewerInterviewsSaga from "./handler/interviewerInterviewsSaga";
+import interviewSessionSaga from "./handler/interviewSessionSaga";
+import interviewFeedbackSaga from "./handler/interviewFeedbackSaga";
 export default function* rootSaga() {
     yield all([
         watchAuthSaga(),
@@ -22,5 +24,7 @@ export default function* rootSaga() {
         watchtodayInterviewsSaga(),
            interviewDetailSaga(), 
                interviewerInterviewsSaga(),
+                interviewSessionSaga(),
+                  interviewFeedbackSaga(), 
     ]);
 }
