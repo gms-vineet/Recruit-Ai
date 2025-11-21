@@ -55,7 +55,7 @@ export default function Topbar({ toggleCollapse, openMobileSidebar }) {
           >
            {fullName[0] || 'O'}
           </div> */}
-          <RiSidebarFoldLine className="text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 h-5 w-5 cursor-pointer" onClick={() => dispatch(setOpen(true))}/>
+          {/* <RiSidebarFoldLine className="text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 h-5 w-5 cursor-pointer" onClick={() => dispatch(setOpen(true))}/> */}
         </div>
        
       </div>

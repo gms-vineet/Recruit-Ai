@@ -1,3 +1,4 @@
+// src/pages/Layout.jsx
 import React, { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "./../components/Sidebar";
@@ -8,15 +9,19 @@ export default function Layout() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { pathname } = useLocation();
 
-  const onInterviewRoom = pathname.startsWith("/interview-room");
+  // ✅ routes where we want NO sidebar at all
+  const hideSidebar =
+    pathname.startsWith("/interview-room") ||
+    pathname.startsWith("/interview/report") ||
+    pathname.startsWith("/interview/feedback");
 
   useEffect(() => {
-    if (onInterviewRoom) {
-      // collapse the desktop rail; drawer will still be available
+    if (hideSidebar) {
+      // collapse + close drawer whenever we enter any interview flow screen
       setIsCollapsed(true);
       setMobileSidebarOpen(false);
     }
-  }, [onInterviewRoom]);
+  }, [hideSidebar]);
 
   const openMobileSidebar = () => setMobileSidebarOpen(true);
   const closeMobileSidebar = () => setMobileSidebarOpen(false);
@@ -39,12 +44,14 @@ export default function Layout() {
 
       {/* content */}
       <div className="relative z-10 flex h-screen">
-        {/* ✅ Always mount Sidebar. Hide only desktop rail in interview room. */}
-       <Sidebar
-   isCollapsed={isCollapsed}
-   mobileOpen={mobileSidebarOpen}
-   onCloseMobile={closeMobileSidebar}
- />
+        {/* ✅ Only render Sidebar when NOT in interview-room/report/feedback */}
+        {!hideSidebar && (
+          <Sidebar
+            isCollapsed={isCollapsed}
+            mobileOpen={mobileSidebarOpen}
+            onCloseMobile={closeMobileSidebar}
+          />
+        )}
 
         <div className="flex-1 flex flex-col min-w-0">
           <Topbar
@@ -53,8 +60,8 @@ export default function Layout() {
           />
 
           <main
-            className={`flex-1 bg-transparent ra-scroll overflow-y-auto ${
-              onInterviewRoom ? "p-2 sm:p-3" : "p-4 sm:p-6"
+            className={`flex-1 bg-transparent ra-scroll  ${
+              hideSidebar ? "p-2 sm:p-3" : "p-4 sm:p-6"
             }`}
           >
             <Outlet />

@@ -4,90 +4,91 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { submitFeedbackRequest } from "@/store/slices/interviewFeedbackSlice";
 import { updateInterviewStatusRequest } from "../store/slices/interviewDetailSlice";
+import { fetchInterviewerInterviewsRequest } from "../store/slices/interviewerInterviewsSlice";
 
 const styles = `
-  /* --- Layout wrapper --- */
-  .fb-wrapper {
+  /* --- Layout wrapper: full-width, centered form --- */
+.fb-wrapper {
     width: 100%;
-    max-width: 840px;
-    padding: 24px 16px 32px;
+    max-width: 1120px;
+    padding: 40px 24px 48px;
     margin: 0 auto;
     min-height: calc(100vh - 4rem);
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: center;
+    color: var(--color-text-base, #0f172a);
   }
 
-  /* --- Card / panel --- */
-  .fb-card {
+  /* --- Form container (card UI removed) --- */
+.fb-card {
     width: 100%;
+    padding: 22px 24px 20px;
     border-radius: 18px;
-    border: 1px solid rgba(148, 163, 184, 0.45);
-    background:
-      radial-gradient(140% 200% at 0% 0%,
-        rgba(56, 189, 248, 0.14),
-        transparent 55%)
-      ,
-      radial-gradient(140% 220% at 100% 0%,
-        rgba(129, 140, 248, 0.16),
-        transparent 60%)
-      ,
-      linear-gradient(135deg,
-        rgba(15, 23, 42, 0.98),
-        rgba(15, 23, 42, 0.96)
-      );
-    box-shadow: 0 26px 70px rgba(15, 23, 42, 0.9);
-    backdrop-filter: blur(18px);
-    color: var(--color-text-base, #e5e7eb);
-    padding: 20px 22px 18px;
+
+    /* ⬅️ transparent so page gradient shows through */
+    background: transparent;
+
+    /* purple border + soft glow */
+    border: 1px solid rgba(167, 139, 250, 0.9);
+    box-shadow:
+      0 0 0 1px rgba(129, 140, 248, 0.55),
+      0 18px 45px rgba(15, 23, 42, 0.75);
+
+    backdrop-filter: blur(16px) saturate(140%);
+    color: var(--color-text-base, #0f172a);
+  }
+
+ .dark .fb-card {
+    background: transparent;              /* ⬅️ keep it transparent in dark too */
+    border-color: rgba(167, 139, 250, 0.95);
+    box-shadow:
+      0 0 0 1px rgba(139, 92, 246, 0.7),
+      0 22px 55px rgba(15, 23, 42, 0.95);
+    color: #e5e7eb;
+  }
+    border-color: rgba(167, 139, 250, 0.95);
+    box-shadow:
+      0 0 0 1px rgba(139, 92, 246, 0.6),
+      0 22px 55px rgba(15, 23, 42, 0.98);
+    color: #e5e7eb;
   }
 
   .fb-card .header {
     margin-bottom: 18px;
   }
 
-  .fb-card .title {
-    font-size: 18px;
+ .fb-card .title {
+    font-size: 20px;
     font-weight: 600;
     margin: 0 0 4px;
     letter-spacing: 0.01em;
   }
 
-  .fb-card .subtitle {
+   .fb-card .subtitle {
     font-size: 13px;
-    color: #9ca3af;
+    color: #6b7280;
     margin: 0;
   }
-
-  .fb-card .meta-row {
-    margin-top: 8px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    font-size: 11px;
+  .dark .fb-card .subtitle {
     color: #9ca3af;
-  }
-
-  .fb-card .meta-pill {
-    border-radius: 999px;
-    border: 1px solid rgba(148, 163, 184, 0.6);
-    padding: 3px 9px;
-    background: radial-gradient(circle at top,
-      rgba(15, 23, 42, 0.4),
-      rgba(15, 23, 42, 0.95)
-    );
   }
 
   /* --- Grid layout for sections (2 columns on desktop) --- */
-  .fb-card .fb-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: 18px;
-  }
+.fb-card .fb-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 24px;
+  row-gap: 12px;
+  margin-top: 12px;  /* ⬅️ pushes all sections a bit away from the top border */
+}
 
   .fb-card .section {
     padding: 10px 0;
-    border-top: 1px solid rgba(30, 41, 59, 0.9);
+    border-top: 1px solid rgba(203, 213, 225, 0.9);
+  }
+  .dark .fb-card .section {
+    border-top-color: rgba(30, 41, 59, 0.9);
   }
 
   .fb-card .section:first-of-type {
@@ -99,15 +100,18 @@ const styles = `
   }
 
   .fb-card .section-title {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 600;
     margin-bottom: 6px;
   }
 
   .fb-card .section-hint {
-    font-size: 12px;
-    color: #94a3b8;
+    font-size: 13px;
+    color: #6b7280;
     margin-bottom: 8px;
+  }
+  .dark .fb-card .section-hint {
+    color: #94a3b8;
   }
 
   @media (max-width: 900px) {
@@ -120,7 +124,7 @@ const styles = `
   .fb-card .options-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 8px;
   }
 
   .fb-card .tick-option {
@@ -128,22 +132,29 @@ const styles = `
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 11px;
+    padding: 6px 14px;
     border-radius: 999px;
-    border: 1px solid rgba(51, 65, 85, 0.9);
-    background: radial-gradient(circle at top,
-      rgba(15, 23, 42, 0.8),
-      rgba(15, 23, 42, 1)
-    );
-    font-size: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.8);
+    background-color: rgba(148, 163, 184, 0.14);
+    font-size: 13px;
     cursor: pointer;
     user-select: none;
-    color: #e5e7eb;
+    color: var(--color-text-base, #0f172a);
     transition:
       background 0.15s ease,
       border-color 0.15s ease,
       box-shadow 0.15s ease,
       transform 0.1s ease;
+    white-space: nowrap;            /* ⬅️ keep each option on one line */
+  }
+  .dark .fb-card .tick-option {
+    border-color: rgba(51, 65, 85, 0.9);
+    background:
+      radial-gradient(circle at top,
+        rgba(15, 23, 42, 0.8),
+        rgba(15, 23, 42, 1)
+      );
+    color: #e5e7eb;
   }
 
   .fb-card .tick-option input {
@@ -159,22 +170,32 @@ const styles = `
 
   .fb-card .tick-option:hover {
     border-color: var(--color-primary, #3b82f6);
+    background-color: rgba(59, 130, 246, 0.08);
+    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.25);
+    transform: translateY(-0.5px);
+  }
+  .dark .fb-card .tick-option:hover {
     background: rgba(37, 99, 235, 0.18);
     box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.35);
-    transform: translateY(-0.5px);
   }
 
   .fb-card .scale-label {
     font-size: 11px;
-    color: #64748b;
+    color: #6b7280;
     margin-top: 4px;
+  }
+  .dark .fb-card .scale-label {
+    color: #64748b;
   }
 
   .fb-card .score-label {
     font-size: 11px;
     font-weight: 500;
-    color: #e5e7eb;
+    color: var(--color-text-base, #0f172a);
     margin-top: 2px;
+  }
+  .dark .fb-card .score-label {
+    color: #e5e7eb;
   }
 
   /* --- Textarea --- */
@@ -182,23 +203,35 @@ const styles = `
     width: 100%;
     min-height: 90px;
     border-radius: 10px;
-    border: 1px solid rgba(51, 65, 85, 1);
+    border: 1px solid rgba(148, 163, 184, 0.8);
     padding: 8px 11px;
-    font-size: 13px;
+    font-size: 14px;
     resize: vertical;
     outline: none;
-    background: rgba(15, 23, 42, 0.98);
-    color: #e5e7eb;
+    background-color: var(--color-bg-base, #f9fafb);
+    color: var(--color-text-base, #0f172a);
   }
 
   .fb-card textarea::placeholder {
-    color: #64748b;
+    color: #94a3b8;
   }
 
   .fb-card textarea:focus {
     border-color: var(--color-primary, #3b82f6);
-    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.4);
-    background: #020617;
+    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.35);
+    background-color: var(--color-bg-surface, #ffffff);
+  }
+
+  .dark .fb-card textarea {
+    background-color: rgba(15, 23, 42, 0.98);
+    color: #e5e7eb;
+    border-color: rgba(51, 65, 85, 1);
+  }
+  .dark .fb-card textarea::placeholder {
+    color: #64748b;
+  }
+  .dark .fb-card textarea:focus {
+    background-color: #020617;
   }
 
   /* --- Footer / button --- */
@@ -211,7 +244,10 @@ const styles = `
   }
 
   .fb-card .hint-small {
-    font-size: 11px;
+    font-size: 12px;
+    color: #6b7280;
+  }
+  .dark .fb-card .hint-small {
     color: #64748b;
   }
 
@@ -240,8 +276,13 @@ const styles = `
   }
 
   @media (max-width: 600px) {
+    .fb-wrapper {
+      padding: 24px 12px 32px;
+      min-height: auto;
+      align-items: flex-start;
+    }
     .fb-card {
-      padding: 16px 14px 12px;
+      padding: 16px 12px 12px;
     }
     .fb-card .options-row {
       gap: 4px;
@@ -249,9 +290,11 @@ const styles = `
     .fb-card .tick-option {
       width: calc(50% - 4px);
       justify-content: flex-start;
+      white-space: normal; /* allow wrapping on small screens */
     }
   }
 `;
+
 const RECOMMENDATION_MAP = {
   strong_hire: "STRONG_HIRE",
   hire: "HIRE",
@@ -276,6 +319,7 @@ const JD_MAP = {
   good_fit: "GOOD",
   uncertain: "UNCERTAIN",
 };
+
 export default function InterviewerFeedback() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -285,8 +329,7 @@ export default function InterviewerFeedback() {
 
   const { submitting, error, lastFeedback } = feedbackState;
 
-  const sessionId =
-    state?.sessionId || interviewSession.sessionId || "—";
+  const sessionId = state?.sessionId || interviewSession.sessionId || "—";
   const candidateName =
     state?.candidateName || interviewSession.candidateName || "Candidate";
   const interviewerName =
@@ -294,7 +337,6 @@ export default function InterviewerFeedback() {
   const jobTitle =
     state?.jobTitle || interviewSession.jobTitle || "Interview Feedback";
 
-  // 🔹 interviewId + duration coming from Report page or Redux
   const interviewId =
     state?.interviewId ||
     interviewSession.interviewId ||
@@ -307,7 +349,6 @@ export default function InterviewerFeedback() {
     interviewSession.summary?.duration ||
     "—";
 
-  // form state
   const [recommendation, setRecommendation] = useState("");
   const [skillsMatch, setSkillsMatch] = useState("");
   const [communication, setCommunication] = useState("");
@@ -321,35 +362,7 @@ export default function InterviewerFeedback() {
     );
   };
 
-  // scores (for UI info only)
-  const skillsMatchScore =
-    skillsMatch === "low"
-      ? 2
-      : skillsMatch === "medium"
-      ? 5
-      : skillsMatch === "high"
-      ? 8
-      : 0;
-
-  const communicationScore =
-    communication === "needs_work"
-      ? 2
-      : communication === "okay"
-      ? 5
-      : communication === "strong"
-      ? 8
-      : 0;
-
-  const jdAlignmentScore =
-    jdAlignment === "uncertain"
-      ? 2
-      : jdAlignment === "good_fit"
-      ? 5
-      : jdAlignment === "perfect_fit"
-      ? 8
-      : 0;
-
- const handleSubmit = (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
 
     if (!interviewId) {
@@ -362,7 +375,6 @@ export default function InterviewerFeedback() {
       return;
     }
 
-    // ---- build body exactly like Swagger example ----
     const flagsObject = flags.reduce((acc, key) => {
       acc[key] = true;
       return acc;
@@ -380,24 +392,27 @@ export default function InterviewerFeedback() {
     dispatch(
       submitFeedbackRequest({
         interviewId,
-        payload, // 👈 saga will send this as request body
+        payload,
       })
     );
-      dispatch(
-    updateInterviewStatusRequest({
-      interviewId,
-      status: "INTERVIEW_DONE",
-    })
-  );
+    dispatch(
+      updateInterviewStatusRequest({
+        interviewId,
+        status: "INTERVIEW_DONE",
+      })
+    );
   };
-  // Navigate on success
-  useEffect(() => {
-    if (!submitting && lastFeedback) {
-      navigate("/dashboard");
-    }
-  }, [submitting, lastFeedback, navigate]);
 
-  // Show error (you can replace with toast)
+useEffect(() => {
+  if (!submitting && lastFeedback) {
+    // 🔄 refresh the sidebar list so status badge changes
+    dispatch(fetchInterviewerInterviewsRequest({ status: "" }));
+
+    // 🧭 go back to dashboard and drop feedback page from history
+    navigate("/dashboard", { replace: true });
+  }
+}, [submitting, lastFeedback, dispatch, navigate]);
+
   useEffect(() => {
     if (error) {
       console.error("Feedback error:", error);
@@ -411,31 +426,7 @@ export default function InterviewerFeedback() {
 
       <form className="fb-card" onSubmit={handleSubmit}>
         <div className="header">
-          <h1 className="title">Interview Feedback</h1>
-          <p className="subtitle">
-            Quick check-boxes + one comment. This helps with fair, consistent analysis.
-          </p>
-          {/* <div className="meta-row">
-            <span className="meta-pill">
-              <strong>Candidate:</strong> {candidateName}
-            </span>
-            <span className="meta-pill">
-              <strong>Interviewer:</strong> {interviewerName}
-            </span>
-            <span className="meta-pill">
-              <strong>Session:</strong> {sessionId}
-            </span>
-            {interviewId && (
-              <span className="meta-pill">
-                <strong>Interview ID:</strong> {interviewId}
-              </span>
-            )}
-            {duration && (
-              <span className="meta-pill">
-                <strong>Duration:</strong> {duration}
-              </span>
-            )}
-          </div> */}
+          <h1 className="title">Interviewer's Feedback</h1>
         </div>
 
         <div className="fb-grid">
@@ -527,10 +518,6 @@ export default function InterviewerFeedback() {
                 <span>High</span>
               </label>
             </div>
-            <div className="scale-label">
-              Score mapping: Low = 2, Medium = 5, High = 8
-            </div>
-            <div className="score-label">Marks: {skillsMatchScore}/10</div>
           </div>
 
           {/* Communication */}
@@ -573,10 +560,6 @@ export default function InterviewerFeedback() {
                 <span>Strong</span>
               </label>
             </div>
-            <div className="scale-label">
-              Score mapping: Needs work = 2, Okay = 5, Strong = 8
-            </div>
-            <div className="score-label">Marks: {communicationScore}/10</div>
           </div>
 
           {/* JD alignment */}
@@ -617,69 +600,11 @@ export default function InterviewerFeedback() {
                 <span>Uncertain / not enough data</span>
               </label>
             </div>
-            <div className="scale-label">
-              Score mapping: Uncertain = 2, Good = 5, Perfect = 8
-            </div>
-            <div className="score-label">Marks: {jdAlignmentScore}/10</div>
           </div>
-
-          {/* Flags */}
-          {/* <div className="section section-full">
-            <div className="section-title">Anything you noticed?</div>
-            <p className="section-hint">
-              Tick anything that applies (optional).
-            </p>
-            <div className="options-row">
-              <label className="tick-option">
-                <input
-                  type="checkbox"
-                  name="flags"
-                  value="strong_technical"
-                  checked={flags.includes("strong_technical")}
-                  onChange={() => toggleFlag("strong_technical")}
-                />
-                <span>Strong technical depth</span>
-              </label>
-              <label className="tick-option">
-                <input
-                  type="checkbox"
-                  name="flags"
-                  value="great_collaboration"
-                  checked={flags.includes("great_collaboration")}
-                  onChange={() => toggleFlag("great_collaboration")}
-                />
-                <span>Great collaboration mindset</span>
-              </label>
-              <label className="tick-option">
-                <input
-                  type="checkbox"
-                  name="flags"
-                  value="needs_clarity"
-                  checked={flags.includes("needs_clarity")}
-                  onChange={() => toggleFlag("needs_clarity")}
-                />
-                <span>Needs more clarity in answers</span>
-              </label>
-              <label className="tick-option">
-                <input
-                  type="checkbox"
-                  name="flags"
-                  value="limited_data"
-                  checked={flags.includes("limited_data")}
-                  onChange={() => toggleFlag("limited_data")}
-                />
-                <span>Limited data (short interview / few answers)</span>
-              </label>
-            </div>
-          </div> */}
 
           {/* Comments */}
           <div className="section section-full">
             <div className="section-title">Final comments (optional)</div>
-            <p className="section-hint">
-              Any short notes that will help reviewers or future rounds
-              (e.g. key strengths, concerns, or suggestions).
-            </p>
             <textarea
               name="comments"
               placeholder="Type a brief, neutral comment here..."
@@ -690,7 +615,7 @@ export default function InterviewerFeedback() {
         </div>
 
         <div className="footer">
-          <span className="hint-small">Takes ~30 seconds to complete.</span>
+          {/* <span className="hint-small">Takes ~30 seconds to complete.</span> */}
           <button
             type="submit"
             className="btn btn-primary"

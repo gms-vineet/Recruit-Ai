@@ -37,15 +37,15 @@ function MainContent() {
     <div className="h-full">
       <ActiveComponent />
 
-      <Toaster position="top-right" reverseOrder={false} />
+      {/* <Toaster position="top-right" reverseOrder={false} /> */}
 
-      <RightSidePanel
+      {/* <RightSidePanel
         open={open}
-        onClose={() => dispatch(setOpen(false))}
+        onClose={() => dispatch(setOpen())}
         title="Panel"
         activeKey={activeKey}
         onSelect={handleSelect}
-      />
+      /> */}
     </div>
   );
 }

@@ -16,6 +16,9 @@ import InterviewRoom from "./pages/InterviewRoom";
 // import Image from "next/image"; // ⬅️ add this
 import InterviewReport from "./pages/InterviewReport";
 import InterviewerFeedback from "./pages/InterviewerFeedback";
+import Todaysinterview from "./pages/Todaysinterview";
+import InterviewRoomGuard from "./authHandle/InterviewRoomGuard";
+import InterviewResultsGuard from "./authHandle/InterviewResultsGuard";
 
 export default function App() {
   return (
@@ -27,10 +30,29 @@ export default function App() {
 
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/dashboard" element={<MainContent />} />
+        <Route path="/todays-interviews" element={<Todaysinterview/>}/>
         <Route path="/interview/:id" element={<CandidateDetail />} /> 
-          <Route path="/interview-room" element={<InterviewRoom />} />
-          <Route path="/interview/report" element={<InterviewReport />} />
-          <Route path="/interview/feedback" element={<InterviewerFeedback />} />
+          <Route path="/interview-room"  element={
+    <InterviewRoomGuard>
+      <InterviewRoom />
+    </InterviewRoomGuard>
+  } />
+            <Route
+    path="/interview/report"
+    element={
+      <InterviewResultsGuard requireSummary>
+        <InterviewReport />
+      </InterviewResultsGuard>
+    }
+  />
+        <Route
+    path="/interview/feedback"
+    element={
+      <InterviewResultsGuard requireInterviewId>
+        <InterviewerFeedback />
+      </InterviewResultsGuard>
+    }
+  />
       </Route>
 
       {/* OPTIONAL: hard-block any accidental redirects to /get-started */}

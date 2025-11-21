@@ -116,7 +116,7 @@ export default function LoginForm() {
               </p>
             )}
           </div>
-
+{/* 
           <div className="flex items-center justify-between text-sm">
             <label className="inline-flex items-center gap-2 select-none text-slate-600 dark:text-slate-300">
               <input
@@ -132,7 +132,7 @@ export default function LoginForm() {
             <Link to="/forgot-password" className="text-purple-500 hover:underline">
               Forgot password?
             </Link>
-          </div>
+          </div> */}
 
           <div className="flex justify-end">
             <button

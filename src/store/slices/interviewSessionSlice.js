@@ -24,13 +24,17 @@ const baseDefaults = {
   // { question, expectedAnswer, verdict, score, explanation, candidateAnswer }
   validation: null,
   aiSuggestions: [], // string[]
-  summary: null, // object from /ai/summary
+
+  // summary from /ai/summary
+  summary: null,
+  loadingSummary: false,
+  summaryStatus: "idle",   // "idle" | "loading" | "succeeded" | "failed"
+  summaryError: null,
 
   // loading flags for saga-driven APIs
   loadingBootstrap: false,
   loadingTurns: false,
   loadingQuestions: false,
-  loadingSummary: false,
   loadingExpected: false,
   loadingValidate: false,
 };
@@ -41,6 +45,7 @@ const loadInitial = () => {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return baseDefaults;
     const stored = JSON.parse(raw);
+    // stored values override, but new keys from baseDefaults stay
     return { ...baseDefaults, ...stored };
   } catch {
     return baseDefaults;
@@ -76,6 +81,10 @@ const interviewSessionSlice = createSlice({
       state.validation = null;
       state.aiSuggestions = [];
       state.summary = null;
+      state.loadingSummary = false;
+      state.summaryStatus = "idle";
+      state.summaryError = null;
+
       state.turns = [];
       state.status = "idle";
       // sessionId & meetingId will be created in InterviewRoom/bootstrap
@@ -97,9 +106,11 @@ const interviewSessionSlice = createSlice({
 
     endInterviewSession(state) {
       state.status = "ended";
+         state.sessionId = null;
     },
 
     resetInterviewSession() {
+      // full reset (also resets summary + flags)
       return { ...baseDefaults };
     },
 
@@ -252,14 +263,19 @@ const interviewSessionSlice = createSlice({
     // 6) POST /ai/summary
     fetchSummaryRequest(state) {
       state.loadingSummary = true;
+      state.summaryStatus = "loading";
+      state.summaryError = null;
+      state.summary = null; // 🔥 clear old data so UI shows skeleton
     },
     fetchSummarySuccess(state, action) {
       state.loadingSummary = false;
+      state.summaryStatus = "succeeded";
       state.summary = action.payload || null;
     },
     fetchSummaryFailure(state, action) {
       state.loadingSummary = false;
-      state.error = action.payload || "Unable to generate summary";
+      state.summaryStatus = "failed";
+      state.summaryError = action.payload || "Unable to generate summary";
     },
   },
 });

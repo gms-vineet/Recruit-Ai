@@ -23,13 +23,13 @@ function* handleLogin(action) {
     );
     yield put(loginSuccess(response.data));
 
-    toast.success('Your loged In!');
+    // toast.success('Your loged In!');
  yield put(checkMeRequest());
    const cid = resp.data?.interviewer?.company_id;
     if (cid) yield put(fetchCompanyRequest(cid));
     localStorage.setItem('token', response.data.access_token);
   } catch (error) {
-    toast.error('log In failed!');
+    // toast.error('log In failed!');
 
     yield put(loginFailure(error.response?.data?.message || error.message));
   }

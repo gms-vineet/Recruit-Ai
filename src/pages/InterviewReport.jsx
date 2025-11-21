@@ -2,14 +2,32 @@
 import React from "react";
 import { useSelector } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
+import Skeleton, { SkeletonTheme } from "react-loading-skeleton";
+import "react-loading-skeleton/dist/skeleton.css";
 
+
+function formatDurationMMSS(totalSeconds) {
+  if (typeof totalSeconds !== "number" || !Number.isFinite(totalSeconds)) {
+    return "—";
+  }
+  const sec = Math.max(0, Math.floor(totalSeconds));
+  const mins = Math.floor(sec / 60);
+  const rem = sec % 60;
+  return `${String(mins).padStart(2, "0")}:${String(rem).padStart(2, "0")}`;
+}
 const styles = `
 .report-wrap {
   min-height: 100vh;
-  background: #020617;
-  color: #e5e7eb;
+  /* Let parent gradient/theme show */
+  background: transparent;
+  color: var(--color-text-base, #e5e7eb);
   font: 15px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   padding: 24px 24px 40px;
+}
+
+/* ---------- LIGHT MODE OVERRIDES ---------- */
+:root:not(.dark) .report-wrap {
+  color: #0f172a;
 }
 
 /* header */
@@ -33,20 +51,6 @@ const styles = `
   font-size: 13px;
   color: #9ca3af;
 }
-.report-meta-inline {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 4px;
-  font-size: 13px;
-  color: #9ca3af;
-}
-.report-meta-pill {
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: #020617;
-  border: 1px solid #1f2937;
-}
 .report-actions {
   display: flex;
   gap: 10px;
@@ -62,23 +66,27 @@ const styles = `
   gap: 6px;
 }
 .report-btn.primary {
-  background: #2563eb;
-  color: #f9fafb;
-}
-.report-btn.ghost {
   background: #020617;
-  color: #e5e7eb;
-  border-color: #374151;
+  color: #f9fafb;
 }
 
 /* hero card (overview + analytics) */
 .report-hero {
-  background: #020617;
+  background: rgba(15, 23, 42, 0.96);
   border-radius: 18px;
   border: 1px solid #1f2937;
   padding: 18px 18px 20px;
   margin-bottom: 16px;
+  color: #e5e7eb;
 }
+
+/* LIGHT: hero becomes light card */
+:root:not(.dark) .report-hero {
+  background: #ffffff;
+  border-color: #e5e7eb;
+  color: #0f172a;
+}
+
 .report-hero-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr);
@@ -96,6 +104,9 @@ const styles = `
   color: #9ca3af;
   margin-bottom: 10px;
 }
+:root:not(.dark) .report-hero-section-title {
+  color: #6b7280;
+}
 .report-overview-list {
   font-size: 14px;
 }
@@ -111,13 +122,16 @@ const styles = `
 .report-overview-value {
   font-weight: 500;
 }
+:root:not(.dark) .report-overview-label {
+  color: #6b7280;
+}
 
 /* analytics gauges */
 .report-analytics-row {
   display: flex;
   flex-wrap: wrap;
   gap: 18px;
-  align-items: flex-end;
+  align-items: flex-start; /* align all dials nicely */
 }
 .gauge {
   position: relative;
@@ -137,6 +151,9 @@ const styles = `
   stroke-width: 9;
   stroke-linecap: round;
 }
+:root:not(.dark) .gauge-track {
+  stroke: #e5e7eb;
+}
 .gauge-fill {
   fill: none;
   stroke-width: 9;
@@ -154,56 +171,38 @@ const styles = `
   font-size: 20px;
   font-weight: 600;
 }
-.gauge-max {
-  font-size: 12px;
-  color: #9ca3af;
-}
 .gauge-label {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: 11px;
   color: #9ca3af;
+  text-align: center;
+  line-height: 1.25;
+  min-height: 26px; /* keep labels same height so arcs line up */
+}
+:root:not(.dark) .gauge-label {
+  color: #6b7280;
 }
 
 /* generic card */
 .report-card {
-  background: #020617;
+  background: rgba(15, 23, 42, 0.96);
   border-radius: 16px;
   border: 1px solid #1f2937;
   padding: 14px 18px 16px;
-}
-.report-card-header {
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #9ca3af;
-  margin-bottom: 10px;
-}
-.report-empty {
-  font-size: 14px;
-  color: #6b7280;
+  color: #e5e7eb;
 }
 
-/* summary blocks (now vertical rows) */
-.report-summary-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+/* LIGHT: summary card becomes light */
+:root:not(.dark) .report-card {
+  background: #ffffff;
+  border-color: #e5e7eb;
+  color: #0f172a;
 }
-.report-summary-row {
-  padding: 10px 0;
-  border-top: 1px solid #111827;
-}
-.report-summary-row:first-child {
-  border-top: none;
-}
-.report-summary-block-title {
-  font-size: 13px;
-  color: #9ca3af;
-  margin-bottom: 4px;
-}
-.report-summary-block-body {
-  font-size: 14px;
-  color: #e5e7eb;
+
+.report-card-header {
+  font-size: 15px;
+  font-weight: 500;
+  margin-bottom: 8px;
 }
 
 /* feedback sections */
@@ -212,6 +211,10 @@ const styles = `
   border-radius: 14px;
   border: 1px solid #111827;
   margin-top: 10px;
+}
+:root:not(.dark) .feedback-section {
+  background: #f9fafb;
+  border-color: #e5e7eb;
 }
 .feedback-header {
   width: 100%;
@@ -222,6 +225,9 @@ const styles = `
   gap: 10px;
   background: #020617;
   cursor: pointer;
+}
+:root:not(.dark) .feedback-header {
+  background: #f9fafb;
 }
 .feedback-header-left {
   display: flex;
@@ -238,6 +244,9 @@ const styles = `
   background: #111827;
   font-size: 14px;
 }
+:root:not(.dark) .feedback-icon {
+  background: #e5e7eb;
+}
 .feedback-title {
   font-size: 15px;
   font-weight: 500;
@@ -247,6 +256,9 @@ const styles = `
   color: #9ca3af;
   transition: transform 0.2s ease;
 }
+:root:not(.dark) .feedback-chevron {
+  color: #6b7280;
+}
 .feedback-chevron.open {
   transform: rotate(180deg);
 }
@@ -254,12 +266,16 @@ const styles = `
   padding: 0 18px 12px 44px;
   font-size: 14px;
 }
+
+/* nicer bullets */
 .feedback-body ul {
   margin: 6px 0 0;
   padding-left: 18px;
+  list-style: disc;
 }
 .feedback-body li {
   margin-bottom: 6px;
+  line-height: 1.5;
 }
 
 /* tiny footer text */
@@ -268,18 +284,59 @@ const styles = `
   color: #9ca3af;
   margin-top: 4px;
 }
+/* analytics gauges */
+.report-analytics-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: stretch;     /* all gauges same height */
+  width: 100%;
+}
+
+.gauge {
+  position: relative;
+  flex: 1 1 0;              /* ✅ each gauge takes equal space */
+  min-width: 140px;         /* wrap nicely on smaller screens */
+  max-width: 220px;         /* optional cap so they don’t get huge */
+  height: 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.gauge svg {
+  width: 100%;              /* fill flex width */
+  height: 80px;
+}
+/* empty text */
+.report-empty {
+  font-size: 14px;
+  color: #6b7280;
+}
 `;
 
 /* ---------- helpers ---------- */
 
-// Split a long sentence into bullets (fallback to single bullet)
+// Turn AI text into clean bullets (no double “-”)
 function toBullets(text) {
   if (!text) return [];
-  const parts = text
-    .split(/[\.\n]/)
+
+  const lines = text
+    .split(/\r?\n/)
     .map((s) => s.trim())
     .filter(Boolean);
-  return parts.length ? parts : [text.trim()];
+
+  let items;
+  if (lines.length > 1) {
+    items = lines;
+  } else {
+    items = text
+      .split(/[.]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  return items.map((line) => line.replace(/^[-•]\s*/, ""));
 }
 
 // Simple semi-circle gauge using SVG
@@ -315,12 +372,97 @@ function Gauge({ label, value, max = 3, color = "#22c55e" }) {
   );
 }
 
+/* ---------- Skeleton while API is loading ---------- */
+
+function ReportSkeleton() {
+  return (
+    <>
+      {/* HERO SKELETON */}
+      <section className="report-hero">
+        <div className="report-hero-grid">
+          {/* Overview skeleton */}
+          <div>
+            <div className="report-hero-section-title">
+              <Skeleton width={80} />
+            </div>
+            <div className="report-overview-list">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="report-overview-row">
+                  <Skeleton width={80} />
+                  <Skeleton width={140} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Analytics skeleton */}
+          <div>
+            <div className="report-hero-section-title">
+              <Skeleton width={80} />
+            </div>
+            <div className="report-analytics-row">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="gauge">
+                  <Skeleton
+                    style={{ borderRadius: 9999 }}
+                    height={80}
+                    width={140}
+                  />
+                  <div className="gauge-label">
+                    <Skeleton width={90} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SUMMARY SKELETON */}
+      <section className="report-card " >
+        <div className="report-card-header">
+          <Skeleton width={120} />
+        </div>
+
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="feedback-section">
+            <div className="feedback-header">
+              <div className="feedback-header-left">
+                <div className="feedback-icon">
+                  <Skeleton circle height={24} width={24} />
+                </div>
+                <div className="feedback-title">
+                  <Skeleton width={130} />
+                </div>
+              </div>
+              <Skeleton width={20} />
+            </div>
+            <div className="feedback-body">
+              <ul>
+                {[1, 2, 3].map((j) => (
+                  <li key={j}>
+                    <Skeleton width="90%" />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        ))}
+      </section>
+    </>
+  );
+}
+
 export default function InterviewReport() {
   const navigate = useNavigate();
   const { state } = useLocation() || {};
+    const location = useLocation();
+  const routeDurationSeconds = location.state?.durationSeconds;
+
+  // if later you also get duration from backend summary, you can OR it here
+  const durationLabel = formatDurationMMSS(routeDurationSeconds);
   const interviewSession = useSelector((s) => s.interviewSession);
 
-  // Summary object from Redux or navigation state
   const summary = interviewSession.summary || state?.summary || null;
   const sessionId =
     state?.sessionId || summary?.session_id || interviewSession.sessionId;
@@ -328,23 +470,11 @@ export default function InterviewReport() {
   const candidateName = interviewSession.candidateName || "Candidate";
   const interviewerName = interviewSession.interviewerName || "Interviewer";
   const jobTitle =
-    interviewSession.jobTitle || state?.jobTitle || "Interview Report";
+    interviewSession.jobTitle || state?.jobTitle || "AI Interview Report";
 
-  // 🔹 Prefer explicit interviewId from state, then summary, then redux
-  // const interviewId =
-  //   state?.interviewId ||
-  //   summary?.interview_id ||
-  //   interviewSession.interviewId ||
-  //   null;
+  // Use sessionId as interviewId (as per your earlier change)
+  const interviewId = sessionId;
 
-    const interviewId = sessionId;
-
-  const jdSnippet = interviewSession.jd
-    ? interviewSession.jd.slice(0, 220) +
-      (interviewSession.jd.length > 220 ? "…" : "")
-    : null;
-
-  // pull fields from summary (with fallbacks)
   const analytics = summary?.analytics || {};
   const strengthsText = summary?.strengths || "";
   const weaknessesText = summary?.weaknesses || "";
@@ -354,7 +484,6 @@ export default function InterviewReport() {
   const weaknessesBullets = toBullets(weaknessesText);
   const interviewBullets = toBullets(interviewSummaryText);
 
-  // Action items (kept here in case you need later)
   let actionBullets = Array.isArray(summary?.action_items)
     ? summary.action_items
     : [];
@@ -390,16 +519,25 @@ export default function InterviewReport() {
     }
   }
 
-  const hasAnyContent =
-    summary &&
-    (strengthsText ||
-      weaknessesText ||
-      interviewSummaryText ||
-      Object.keys(analytics || {}).length > 0);
+  // const hasAnyContent =
+  //   summary &&
+  //   (strengthsText ||
+  //     weaknessesText ||
+  //     interviewSummaryText ||
+  //     Object.keys(analytics || {}).length > 0);
+  const hasScores = Object.values(analytics || {}).some(
+    (v) => typeof v === "number" && v > 0
+  );
 
-  // Overview
+  const hasAnyText = Boolean(
+    strengthsText.trim() ||
+      weaknessesText.trim() ||
+      interviewSummaryText.trim()
+  );
+
+  const hasAnyContent = Boolean(summary && (hasScores || hasAnyText));
+
   const overview = {
-    type: summary?.interview_type || "Interview",
     date:
       summary?.date ||
       new Date().toLocaleDateString(undefined, {
@@ -407,9 +545,7 @@ export default function InterviewReport() {
         month: "short",
         year: "numeric",
       }),
-    experience: summary?.experience || "Not specified",
-    roleFit: summary?.role_fit || "Not evaluated",
-    duration: summary?.duration || "—", // 🔹 pass this to Feedback page
+    duration: summary?.duration || "—",
   };
 
   const [openSections, setOpenSections] = React.useState({
@@ -421,14 +557,13 @@ export default function InterviewReport() {
   const toggleSection = (key) =>
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
 
-  // 🔹 Go to feedback page, passing interviewId + duration + context
-   const goToFeedback = () => {
+  const goToFeedback = () => {
     if (!sessionId) return;
 
     navigate("/interview/feedback", {
       state: {
         sessionId,
-        interviewId: sessionId, // ✅ this is your {interview_id} for API
+        interviewId: sessionId,
         candidateName,
         interviewerName,
         jobTitle,
@@ -437,35 +572,29 @@ export default function InterviewReport() {
     });
   };
 
+  // 🔥 Detect loading state for skeleton
+  // Adjust this to match your slice:
+  // e.g. summaryStatus === "loading" OR summaryLoading boolean
+ const isSummaryLoading =
+    interviewSession.summaryStatus === "loading" ||
+    interviewSession.loadingSummary === true;
 
   return (
     <div className="report-wrap">
       <style>{styles}</style>
-
+  <SkeletonTheme
+        baseColor="#020617"      // near your card background
+        highlightColor="#111827" // subtle highlight
+        borderRadius={6}
+      >
       {/* HEADER */}
       <header className="report-header">
         <div className="report-title-group">
           <div className="report-title">{jobTitle}</div>
-          <div className="report-subtitle">
-            Candidate report generated by AI assistant
-          </div>
+          <div className="report-subtitle" />
         </div>
 
         <div className="report-actions">
-          <button
-            type="button"
-            className="report-btn ghost"
-            onClick={() => navigate("/dashboard")}
-          >
-            ← Back to Dashboard
-          </button>
-          <button
-            type="button"
-            className="report-btn ghost"
-            onClick={() => window.print()}
-          >
-            Print / Save PDF
-          </button>
           <button
             type="button"
             className="report-btn primary"
@@ -473,13 +602,16 @@ export default function InterviewReport() {
             disabled={!interviewId}
             title={!interviewId ? "Missing interview id" : ""}
           >
-            Next: Interviewer feedback →
+            Interviewer feedback 
           </button>
         </div>
       </header>
 
-      {/* NO SUMMARY STATE */}
-      {!hasAnyContent && (
+      {/* ⏳ When API is loading – show skeleton */}
+      {isSummaryLoading && <ReportSkeleton />}
+
+      {/* When not loading, show real content */}
+      {!isSummaryLoading && !hasAnyContent && (
         <div className="report-card">
           <div className="report-card-header">Summary</div>
           <div className="report-empty">
@@ -489,7 +621,7 @@ export default function InterviewReport() {
         </div>
       )}
 
-      {hasAnyContent && (
+      {!isSummaryLoading && hasAnyContent && (
         <>
           {/* TOP HERO: OVERVIEW + ANALYTICS */}
           <section className="report-hero">
@@ -498,7 +630,6 @@ export default function InterviewReport() {
               <div>
                 <div className="report-hero-section-title">Overview</div>
                 <div className="report-overview-list">
-                  <div className="report-overview-row" />
                   <div className="report-overview-row">
                     <span className="report-overview-label">Candidate</span>
                     <span className="report-overview-value">
@@ -520,7 +651,7 @@ export default function InterviewReport() {
                   <div className="report-overview-row">
                     <span className="report-overview-label">Duration</span>
                     <span className="report-overview-value">
-                      {overview.duration}
+                      {durationLabel}
                     </span>
                   </div>
                 </div>
@@ -530,34 +661,18 @@ export default function InterviewReport() {
               <div>
                 <div className="report-hero-section-title">Analytics</div>
                 <div className="report-analytics-row">
-                  <Gauge
-                    label="Skills Match"
-                    value={analytics.skills_match ?? 0}
-                    color="#f97316"
-                  />
-                  <Gauge
-                    label="Communication & Experience"
-                    value={analytics.communication_experience ?? 0}
-                    color="#22c55e"
-                  />
-                  <Gauge
-                    label="JD Alignment"
-                    value={analytics.jd_alignment ?? 0}
-                    color="#38bdf8"
-                  />
-                  <Gauge
-                    label="Overall Score"
-                    value={analytics.overall_score ?? 0}
-                    color="#a855f7"
-                  />
-                </div>
+  <Gauge label="Skills Match" value={analytics.skills_match ?? 0} color="#f97316" />
+  <Gauge label="Communication & Experience" value={analytics.communication_experience ?? 0} color="#22c55e" />
+  <Gauge label="JD Alignment" value={analytics.jd_alignment ?? 0} color="#38bdf8" />
+  <Gauge label="Overall Score" value={analytics.overall_score ?? 0} color="#a855f7" />
+</div>
               </div>
             </div>
           </section>
 
-          {/* INTERVIEW FEEDBACK – ACCORDION SECTIONS */}
+          {/* SUMMARY / SECTIONS */}
           <section className="report-card">
-            <div className="report-card-header">Summary (AI Overview)</div>
+            <div className="report-card-header">Overview</div>
 
             {/* Strengths */}
             <div className="feedback-section">
@@ -568,7 +683,7 @@ export default function InterviewReport() {
               >
                 <div className="feedback-header-left">
                   <div className="feedback-icon">👍</div>
-                  <div className="feedback-title">Strengths (AI view)</div>
+                  <div className="feedback-title">Strengths </div>
                 </div>
                 <span
                   className={
@@ -594,7 +709,7 @@ export default function InterviewReport() {
               )}
             </div>
 
-            {/* Weaknesses / improvements */}
+            {/* Weaknesses */}
             <div className="feedback-section">
               <button
                 type="button"
@@ -603,7 +718,7 @@ export default function InterviewReport() {
               >
                 <div className="feedback-header-left">
                   <div className="feedback-icon">👎</div>
-                  <div className="feedback-title">Weaknesses (AI view)</div>
+                  <div className="feedback-title">Weaknesses</div>
                 </div>
                 <span
                   className={
@@ -631,7 +746,7 @@ export default function InterviewReport() {
               )}
             </div>
 
-            {/* Interview summary */}
+            {/* Interview Summary */}
             <div className="feedback-section">
               <button
                 type="button"
@@ -660,7 +775,9 @@ export default function InterviewReport() {
                       ))}
                     </ul>
                   ) : (
-                    <p className="report-empty">No strengths captured.</p>
+                    <p className="report-empty">
+                      No interview summary captured.
+                    </p>
                   )}
                 </div>
               )}
@@ -668,6 +785,7 @@ export default function InterviewReport() {
           </section>
         </>
       )}
+      </SkeletonTheme>
     </div>
   );
 }

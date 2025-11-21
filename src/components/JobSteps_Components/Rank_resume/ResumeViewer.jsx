@@ -1,4 +1,4 @@
-// src/pages/ResumeViewer.jsx
+// src/pages/ResumeViewer.jsx  (or components/.../ResumeViewer.jsx)
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PreflightModal from "@/components/Modal/PreflightModal";
@@ -7,6 +7,82 @@ import { updateInterviewStatusRequest } from "@/store/slices/interviewDetailSlic
 
 const ABSENT_STATUS = "ABSENT";
 const INTERVIEW_SCHEDULED_STATUS = "INTERVIEW_SCHEDULED";
+
+/** —— renderer for the Job Description (clean markdown) —— */
+const RenderJobDescription = ({ text }) => {
+  if (!text) return null;
+
+  const lines = String(text).split(/\r?\n/);
+  const blocks = [];
+  let listItems = [];
+
+  const flushList = () => {
+    if (!listItems.length) return;
+    blocks.push(
+      <ul
+        key={`ul-${blocks.length}`}
+        className="list-disc pl-5 space-y-1 text-sm text-slate-800 dark:text-slate-100"
+      >
+        {listItems}
+      </ul>
+    );
+    listItems = [];
+  };
+
+  lines.forEach((line, idx) => {
+    const raw = line ?? "";
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      flushList();
+      blocks.push(<div key={`sp-${idx}`} className="h-3" />);
+      return;
+    }
+
+    // headings like **About VFS**
+    const headingMatch = trimmed.match(/^\*\*(.+?)\*\*\s*$/);
+    if (headingMatch) {
+      flushList();
+      const title = headingMatch[1];
+      blocks.push(
+        <h4
+          key={`h-${idx}`}
+          className="mt-3 mb-1 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+        >
+          {title}
+        </h4>
+      );
+      return;
+    }
+
+    // bullet lines: "- something"
+    if (/^\-/.test(trimmed)) {
+      const bulletText = trimmed
+        .replace(/^\-\s*/, "")
+        .replace(/\*\*/g, ""); // remove any ** inside
+      listItems.push(
+        <li key={`li-${idx}`} className="text-sm leading-6">
+          {bulletText}
+        </li>
+      );
+      return;
+    }
+
+    // normal paragraph – strip any ** and render as text
+    flushList();
+    const paragraph = trimmed.replace(/\*\*/g, "");
+    blocks.push(
+      <p
+        key={`p-${idx}`}
+        className="text-sm leading-6 text-slate-800 dark:text-slate-100"
+      >
+        {paragraph}
+      </p>
+    );
+  });
+
+  flushList();
+  return <div className="space-y-1">{blocks}</div>;
+};
 
 /** —— simple renderer for the AI summary —— */
 const RenderAISummary = ({ text }) => {
@@ -84,6 +160,7 @@ export default function ResumeViewer({ data }) {
   const selected = selectedIndex >= 0 ? rows[selectedIndex] : null;
 
   const [showPreflight, setShowPreflight] = useState(false);
+  const [showAbsentConfirm, setShowAbsentConfirm] = useState(false); // 🔸 NEW
   const me = useSelector((s) => s?.auth?.me);
   const { updatingStatus } = useSelector((s) => s?.interviewDetail || {});
   const dispatch = useDispatch();
@@ -155,7 +232,7 @@ export default function ResumeViewer({ data }) {
 
   if (!selected) {
     return (
-      <div className="grid h-[85vh] place-items-center rounded-xl ra-scroll border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+      <div className="grid h-[85vh] place-items-center rounded-xl ra-scroll border border-slate-200 dark:border-slate-800 dark:bg-slate-950">
         <div className="text-slate-500 dark:text-slate-400">
           Select a candidate to see details.
         </div>
@@ -180,12 +257,11 @@ export default function ResumeViewer({ data }) {
   const canMarkAbsent =
     isInterviewScheduled && !isAlreadyAbsent && !!selected.interview_id;
 
-  // 🔹 Interview Room should also only be enabled when INTERVIEW_SCHEDULED
   const canOpenInterviewRoom =
     isInterviewScheduled && !!selected.interview_id;
 
   return (
-    <div className="relative grid h-[85vh] grid-rows-[auto,1fr] w-full overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+    <div className="relative grid h-[85vh] grid-rows-[auto,1fr] w-full overflow-hidden rounded-xl">
       {/* ===== Non-scrolling PROFILE header (short) ===== */}
       <header className="px-4 pt-6 pb-4">
         <div className="mx-auto w-full max-w-6xl">
@@ -231,7 +307,9 @@ export default function ResumeViewer({ data }) {
                     {/* Mark as absent button */}
                     <button
                       type="button"
-                      onClick={handleMarkAbsent}
+                      onClick={() =>
+                        canMarkAbsent && setShowAbsentConfirm(true)
+                      } // 🔸 open confirm modal
                       disabled={updatingStatus || !canMarkAbsent}
                       className={`rounded-lg px-3 py-1.5 text-sm font-semibold shadow focus:outline-none focus:ring-2 ${
                         !isInterviewScheduled
@@ -274,9 +352,7 @@ export default function ResumeViewer({ data }) {
                 <div className="text-sm font-semibold mb-2">
                   Job Description
                 </div>
-                <pre className="whitespace-pre-wrap text-sm leading-6">
-                  {selected.jd_raw}
-                </pre>
+                <RenderJobDescription text={selected.jd_raw} />
               </Panel>
             )}
             {!!selected?.resume_raw && (
@@ -487,6 +563,46 @@ export default function ResumeViewer({ data }) {
           </div>
         </div>
       </main>
+
+      {/* ===== Confirm "Mark as absent" modal ===== */}
+      {showAbsentConfirm && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+              Mark as absent?
+            </h2>
+            <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+              This will mark{" "}
+              <span className="font-semibold">{getName(selected)}</span> as{" "}
+              <span className="font-semibold">ABSENT</span> for this interview.
+            </p>
+            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+              {/* You can update the status later only from the admin/recruiter
+              side. */}
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-md px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                onClick={() => setShowAbsentConfirm(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-md bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white shadow hover:bg-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-400 disabled:opacity-60"
+                onClick={() => {
+                  setShowAbsentConfirm(false);
+                  handleMarkAbsent();
+                }}
+                disabled={updatingStatus}
+              >
+                Yes, mark absent
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ===== Preflight Modal for this interview ===== */}
       <PreflightModal

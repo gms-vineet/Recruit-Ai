@@ -5,6 +5,7 @@ import {
   RiHome4Line,
   RiLogoutCircleRLine,
   RiCloseLine,
+   RiCalendarTodoLine,
 } from "@remixicon/react";
 import SmallJobCard from "./SmallJobCard";
 import { useDispatch, useSelector } from "react-redux";
@@ -24,6 +25,11 @@ import { fetchInterviewerInterviewsRequest } from "../store/slices/interviewerIn
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: RiHome4Line },
+  {
+    to: "/todays-interviews",              // 👈 adjust this route if you use a different one
+    label: "Today's Interviews",
+    icon: RiCalendarTodoLine,
+  },
 ];
 
 export default function Sidebar({ isCollapsed, mobileOpen, onCloseMobile }) {
@@ -35,16 +41,30 @@ const getStatusBadgeClass = (status) => {
 
   switch (s) {
     case "INTERVIEW_SCHEDULED":
-      // Green
-      return "bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/40";
+      return (
+        // 💡 Light mode – solid, readable green
+        "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300/80 " +
+        // 🌙 Dark mode – keep subtle glow
+        "dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/40"
+      );
+
     case "INTERVIEW_DONE":
-      // Greyed out
-      return "bg-slate-500/15 text-slate-300 ring-1 ring-slate-500/40";
+      return (
+        "bg-slate-200 text-slate-700 ring-1 ring-slate-400/80 " +
+        "dark:bg-slate-500/15 dark:text-slate-300 dark:ring-slate-500/40"
+      );
+
     case "ABSENT":
-      // Red
-      return "bg-rose-500/15 text-rose-400 ring-1 ring-rose-500/40";
+      return (
+        "bg-rose-100 text-rose-700 ring-1 ring-rose-300/80 " +
+        "dark:bg-rose-500/15 dark:text-rose-300 dark:ring-rose-500/40"
+      );
+
     default:
-      return "bg-slate-600/15 text-slate-300 ring-1 ring-slate-600/40";
+      return (
+        "bg-slate-100 text-slate-700 ring-1 ring-slate-300/80 " +
+        "dark:bg-slate-600/15 dark:text-slate-300 dark:ring-slate-600/40"
+      );
   }
 };
 
@@ -291,13 +311,13 @@ const getStatusLabel = (status) => {
         </div>
 
         {c.status && (
-          <span
-            className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${getStatusBadgeClass(
-              c.status
-            )}`}
-          >
-            {getStatusLabel(c.status)}
-          </span>
+        <span
+  className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${getStatusBadgeClass(
+    c.status
+  )}`}
+>
+  {getStatusLabel(c.status)}
+</span>
         )}
       </div>
 

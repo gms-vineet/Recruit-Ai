@@ -46,15 +46,18 @@ export default function TodayInterviewCard({ data, onStart }) {
   const calendarHref = calendarLink || calendar_link;
 
   return (
-    <div className="w-full rounded-2xl border border-slate-200/20 bg-white/70 dark:bg-slate-900/60 backdrop-blur shadow-lg p-5 hover:shadow-xl transition-shadow">
+    // <div className="w-full rounded-2xl border border-slate-200/20 bg-white/70 dark:bg-slate-900/60 backdrop-blur shadow-lg p-5 hover:shadow-xl transition-shadow">
+        <div className="w-full rounded-2xl border border-slate-200/60 dark:border-slate-700/70 
+                    bg-white/85 dark:bg-slate-900/80 
+                    backdrop-blur shadow-lg p-5 hover:shadow-xl transition-shadow">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="h-11 w-11 grid place-items-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow">
+         <div className="h-11 w-11 grid place-items-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow">
             <RiUser3Line className="h-6 w-6" />
           </div>
           <div>
-            <div className="text-lg font-semibold">{candidate?.name}</div>
+            <div className="text-lg font-semibold text-slate-900 dark:text-slate-50">{candidate?.name}</div>
             <div className="text-xs text-slate-500 dark:text-slate-400">
               {candidate?.email} • {candidate?.phone}
             </div>
@@ -68,7 +71,7 @@ export default function TodayInterviewCard({ data, onStart }) {
 
       {/* Body */}
       <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="space-y-2">
+        <div className="space-y-2 text-slate-700 dark:text-slate-200">
           <div className="flex items-center gap-2 text-sm">
             <RiBriefcase2Line className="h-4 w-4 text-slate-400" />
             <span className="font-medium">{role}</span>
@@ -89,7 +92,7 @@ export default function TodayInterviewCard({ data, onStart }) {
           </div>
         </div>
 
-        <div className="space-y-2">
+          <div className="space-y-2 text-slate-700 dark:text-slate-200">
           <div className="flex items-center gap-2 text-sm">
             <RiCalendarLine className="h-4 w-4 text-slate-400" />
             <span>{fmtDate(start)}</span>
@@ -138,7 +141,7 @@ export default function TodayInterviewCard({ data, onStart }) {
           </div>
         </div>
 
-        <div className="flex items-end md:items-center justify-between md:justify-end gap-3">
+      <div className="flex items-end md:items-center justify-between md:justify-end gap-3">
           <a
             href={resumeUrl}
             target="_blank"

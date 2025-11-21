@@ -142,50 +142,54 @@ export default function Job_Description() {
     navigate(`/interview/${interview.id}`);
   };
 
-  const Card = (it) => (
-    <div
-      key={it.id}
-      onClick={() => openInterview(it)}
-      className="rounded-xl border border-slate-200/20 bg-white/70 dark:bg-slate-900/60 backdrop-blur shadow p-4 hover:shadow-md transition-shadow cursor-pointer"
-      role="button"
-      aria-label={`Open ${getName(it)}`}
-    >
-      <div className="flex items-center justify-between">
-        <div className="font-semibold truncate">{getName(it)}</div>
-        <span className="px-2.5 py-1 text-[10px] rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-          {it.status}
-        </span>
-      </div>
-
-      <div className="mt-3 flex items-center gap-2 text-sm">
-        <span className="font-medium">{it.role}</span>
-      </div>
-
-      <div className="mt-2 flex items-center gap-3 text-xs text-slate-500">
-        <span>{fmtDate(it.start)}</span>
-      </div>
-
-      <div className="mt-1 flex items-center gap-3 text-xs text-slate-500">
-        <span>
-          {fmtTime(it.start)} – {fmtTime(it.end)}
-        </span>
-      </div>
-
-      {/* 🔹 View in calendar (stops card click) */}
-    {it.calendar_link && (
-  <a
-    href={it.calendar_link}
-    target="_blank"
-    rel="noreferrer"
-    onClick={(e) => e.stopPropagation()} // keep card click from firing
-    className="mt-2 inline-flex items-center gap-1 text-[11px] text-indigo-500 hover:text-indigo-400"
+const Card = (it) => (
+  <div
+    key={it.id}
+    onClick={() => openInterview(it)}
+    className="rounded-xl border border-slate-200/60 dark:border-slate-700/70 
+               bg-white/80 dark:bg-slate-900/70 
+               backdrop-blur shadow-sm hover:shadow-md 
+               transition-shadow cursor-pointer"
+    role="button"
+    aria-label={`Open ${getName(it)}`}
   >
-    <RiCalendarLine className="h-3 w-3" />
-    <span>View in Calendar</span>
-  </a>
-)}
+    <div className="flex items-center justify-between">
+      <div className="font-semibold truncate text-slate-900 dark:text-slate-50">
+        {getName(it)}
+      </div>
+      <span className="px-2.5 py-1 text-[10px] rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+        {it.status}
+      </span>
     </div>
-  );
+
+    <div className="mt-3 flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+      <span className="font-medium">{it.role}</span>
+    </div>
+
+    <div className="mt-2 flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+      <span>{fmtDate(it.start)}</span>
+    </div>
+
+    <div className="mt-1 flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+      <span>
+        {fmtTime(it.start)} – {fmtTime(it.end)}
+      </span>
+    </div>
+
+    {it.calendar_link && (
+      <a
+        href={it.calendar_link}
+        target="_blank"
+        rel="noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className="mt-2 inline-flex items-center gap-1 text-[11px] text-indigo-500 hover:text-indigo-400"
+      >
+        <RiCalendarLine className="h-3 w-3" />
+        <span>View in Calendar</span>
+      </a>
+    )}
+  </div>
+);
 
   return (
     <div className="h-full w-full grid place-items-center">

@@ -148,15 +148,29 @@ export default function PreflightModal({
     );
 
     // ✅ use interviewId prop, not row.interview_id
+    // navigate("/interview-room", {
+    //   state: {
+    //     interviewId: interviewId || null,
+    //     autostart: {
+    //       mic: !!micStreamRef.current,
+    //       tab: !!tabStreamRef.current,
+    //     },
+    //     promptMic: false,
+    //   },
+    // });
     navigate("/interview-room", {
       state: {
         interviewId: interviewId || null,
+        candidateName,
+        interviewerName,
+        jdText,
+        resumeText,
         autostart: {
           mic: !!micStreamRef.current,
           tab: !!tabStreamRef.current,
         },
         promptMic: false,
-      },
+     },
     });
 
     onClose?.();
@@ -177,28 +191,34 @@ export default function PreflightModal({
   const allStepsDone = steps.every((s) => s.done);
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60">
-      <div className="w-[560px] max-w-[95vw] rounded-2xl border border-slate-800 bg-slate-950 text-slate-100 shadow-2xl">
+     <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/30 dark:bg-slate-950/70 backdrop-blur-sm">
+      <div
+        className="
+          w-[560px] max-w-[95vw] rounded-2xl shadow-2xl
+          border border-slate-200/80 bg-white/95 text-slate-900
+          dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100
+        "
+      >
         {/* header */}
-        <div className="flex items-start justify-between px-6 pt-5 pb-3 border-b border-slate-900/70">
+       <div className="flex items-start justify-between px-6 pt-5 pb-3 border-b border-slate-200/80 dark:border-slate-900/70">
           <div>
-            <h2 className="text-sm font-semibold">
+           <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
               Get ready with Interview Copilot
             </h2>
-            <p className="mt-1 text-xs text-slate-400">
+           <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
               We&apos;ll listen to the meeting audio and your mic to generate
               live notes and an interview summary for{" "}
-              <span className="font-medium text-slate-200">
+             <span className="font-medium text-slate-900 dark:text-slate-100">
                 {candidateName}
               </span>
               .
             </p>
           </div>
 
-          <button
+         <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+            className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-100"
             aria-label="Close"
           >
             ✕
@@ -207,8 +227,8 @@ export default function PreflightModal({
 
         {/* stepper */}
         <div className="px-6 pt-3 pb-2">
-          <div className="mb-2 flex items-center justify-between text-[11px] text-slate-400">
-            <span className="uppercase tracking-wide text-[10px] text-slate-500">
+          <div className="mb-2 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+            <span className="uppercase tracking-wide text-[10px] text-slate-500 dark:text-slate-400">
               Setup checklist
             </span>
             <span>{completedCount}/3 steps completed</span>
@@ -222,18 +242,18 @@ export default function PreflightModal({
                     className={[
                       "flex h-6 w-6 items-center justify-center rounded-full border text-[12px] font-semibold",
                       step.done
-                        ? "border-emerald-400 bg-emerald-500/20 text-emerald-200"
-                        : "border-slate-600 bg-slate-900 text-slate-600",
+                        ? "border-emerald-500 bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-200"
+                        : "border-slate-300 bg-slate-50 text-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-600",
                     ].join(" ")}
                   >
                     {step.done ? "✓" : ""}
                   </div>
-                  <span className="hidden text-[11px] text-slate-300 sm:inline">
+                  <span className="hidden text-[11px] text-slate-600 dark:text-slate-300 sm:inline">
                     {step.label}
                   </span>
                 </div>
-                {idx < steps.length - 1 && (
-                  <div className="flex-1 h-px bg-slate-800/80" />
+                 {idx < steps.length - 1 && (
+                  <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800/80" />
                 )}
               </React.Fragment>
             ))}
@@ -247,15 +267,15 @@ export default function PreflightModal({
             <li className="flex gap-3">
               <div />
               <div className="space-y-1">
-                <p className="font-medium text-slate-100">
+               <p className="font-medium text-slate-900 dark:text-slate-100">
                   Open your meeting tab.
                 </p>
-                <p className="text-slate-400">
+              <p className="text-slate-600 dark:text-slate-400">
                   If a meeting link is configured, we&apos;ll open it for you in
                   a new tab when you share the interviewer&apos;s audio.
                 </p>
                 {!meetUrl && (
-                  <p className="text-xs text-amber-400">
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
                     No Meet link is set for this interview. The interviewer
                     should join their call manually before sharing audio.
                   </p>
@@ -265,20 +285,27 @@ export default function PreflightModal({
 
             {/* Step 2 */}
             <li className="flex gap-3">
-              <div>{step2Done ? "✓" : ""}</div>
+              <div className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">
+                {step2Done ? "✓" : ""}
+              </div>
               <div className="space-y-1">
-                <p className="font-medium text-slate-100">
+                 <p className="font-medium text-slate-900 dark:text-slate-100">
                   Share the interviewer&apos;s audio.
                 </p>
-                <p className="text-slate-400">
+                 <p className="text-slate-600 dark:text-slate-400">
                   Click the button below, pick the meeting <b>tab</b>, and make
                   sure &quot;Share tab audio&quot; is enabled so the copilot
                   can hear the conversation.
                 </p>
-                <button
+                 <button
                   type="button"
                   onClick={openMeetAndCaptureTab}
-                  className="mt-2 inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-[11px] font-medium text-slate-50 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="
+                    mt-2 inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-[11px] font-medium transition-colors
+                    border-slate-300 bg-slate-100 text-slate-800 hover:bg-slate-200
+                    dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:bg-slate-800
+                    disabled:cursor-not-allowed disabled:opacity-50
+                  "
                 >
                   {tabReady
                     ? "Interviewer audio shared ✓"
@@ -288,31 +315,38 @@ export default function PreflightModal({
             </li>
 
             {/* Step 3 */}
-            <li className="flex gap-3">
-              <div>{step3Done ? "✓" : ""}</div>
+             <li className="flex gap-3">
+              <div className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">
+                {step3Done ? "✓" : ""}
+              </div>
               <div className="space-y-1">
-                <p className="font-medium text-slate-100">
+                <p className="font-medium text-slate-900 dark:text-slate-100">
                   Share your microphone.
                 </p>
-                <p className="text-slate-400">
+                <p className="text-slate-600 dark:text-slate-400">
                   Turn on your mic so the copilot can also capture your
                   comments and follow-up questions.
                 </p>
                 <button
                   type="button"
                   onClick={pickMic}
-                  className="mt-2 inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-[11px] font-medium text-slate-50 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="
+                    mt-2 inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-[11px] font-medium transition-colors
+                    border-slate-300 bg-slate-100 text-slate-800 hover:bg-slate-200
+                    dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:bg-slate-800
+                    disabled:cursor-not-allowed disabled:opacity-50
+                  "
                 >
                   {micReady ? "Your mic is on ✓" : "Share your audio"}
                 </button>
               </div>
-            </li>
+            </li>   
           </ol>
         </div>
 
         {/* footer CTA */}
-        <div className="mt-2 flex items-center justify-between border-t border-slate-800 px-6 py-3">
-          <p className="text-[11px] text-slate-400"></p>
+         <div className="mt-2 flex items-center justify-between border-t border-slate-200 dark:border-slate-800 px-6 py-3">
+          <p className="text-[11px] text-slate-500 dark:text-slate-400"></p>
           <SparkleButton onClick={startInterview} disabled={!allStepsDone}>
             Start Interview
           </SparkleButton>

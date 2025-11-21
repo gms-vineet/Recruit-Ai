@@ -118,14 +118,14 @@ export default function CandidateDetail() {
   if (error) {
     return (
       <div className="max-w-6xl mx-auto px-4 ra-scroll py-6">
-        <button
+        {/* <button
           onClick={handleBack}
           className="inline-flex items-center gap-2 text-sm text-indigo-500 hover:underline"
         >
           <RiArrowLeftLine className="h-4 w-4" />
           Back to dashboard
         </button>
-        <p className="mt-4 text-sm text-red-500">Error: {error}</p>
+        <p className="mt-4 text-sm text-red-500">Error: {error}</p> */}
       </div>
     );
   }
@@ -133,7 +133,7 @@ export default function CandidateDetail() {
   if (!resume) {
     return (
       <div className="max-w-6xl mx-auto px-4 ra-scroll py-6">
-        <button
+        {/* <button
           onClick={handleBack}
           className="inline-flex items-center gap-2 text-sm text-indigo-500 hover:underline"
         >
@@ -142,21 +142,21 @@ export default function CandidateDetail() {
         </button>
         <p className="mt-4 text-sm text-slate-500">
           No resume found for this interview.
-        </p>
+        </p> */}
       </div>
     );
   }
 
   // ---- MAIN UI: pure ResumeViewer ----
   return (
-    <div className="max-w-6xl mx-auto px-4 ra-scroll py-6">
-      <button
+    <div className="max-w-6xl mx-auto px-4 ra-scroll ">
+      {/* <button
         onClick={handleBack}
         className="mb-4 inline-flex items-center gap-2 text-sm text-indigo-500 hover:underline"
       >
         <RiArrowLeftLine className="h-4 w-4" />
         Back to dashboard
-      </button>
+      </button> */}
 
       <ResumeViewer data={dataForViewer} />
     </div>

@@ -8,7 +8,7 @@ function NavbarWA({ isHome }) {
   return (
     <nav className="flex items-center justify-between py-6">
       <Link className="text-2xl font-bold text-logotextcolor" to={"/"}>
-        Recruit.Ai
+        Recruit.AI Interviewer
       </Link>
       <div className="flex items-center space-x-8 text-slate-300">
         {/* <a href="#" >AI Solutions</a>
