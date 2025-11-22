@@ -386,6 +386,7 @@ const getStatusLabel = (status) => {
 
   /* ===================== Mobile Drawer (<md) ===================== */
   /* ===================== Mobile Drawer (<md) ===================== */
+  /* ===================== Mobile Drawer (<md) ===================== */
   const MobileDrawer = (
     <div
       className={`md:hidden fixed inset-0 z-50 ${
@@ -413,9 +414,11 @@ const getStatusLabel = (status) => {
         aria-modal="true"
         aria-label="Mobile Sidebar"
       >
-        {/* Close */}
+        {/* Header */}
         <div className="flex items-center justify-between px-3 h-14">
-          <span className="font-bold text-logotextcolor">Recruit.Ai</span>
+          <span className="font-bold text-logotextcolor">
+            Recruit.Ai <span className="text-slate-200">Interviewer</span>
+          </span>
           <button
             onClick={onCloseMobile}
             aria-label="Close sidebar"
@@ -425,8 +428,9 @@ const getStatusLabel = (status) => {
           </button>
         </div>
 
-        {/* Nav */}
+        {/* Nav + lists */}
         <nav className="flex-1 px-2 py-4 space-y-2 overflow-y-auto">
+          {/* MAIN NAV ITEMS (Dashboard, Today's Interviews) */}
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -446,13 +450,89 @@ const getStatusLabel = (status) => {
             );
           })}
 
-          <div className="px-2 py-2">
+          {/* CANDIDATE LIST – same as desktop */}
+          <div className="mt-4">
             <div className="px-1 pb-2 text-sm text-slate-700 dark:text-slate-300">
+              Candidate List
+            </div>
+
+            <div className="space-y-2 px-1">
+              {interviewsLoading && (
+                <div className="text-xs text-slate-400">
+                  Loading interviews…
+                </div>
+              )}
+
+              {!interviewsLoading && candidatesToday.length === 0 && (
+                <div className="text-xs text-slate-400">
+                  No interviews assigned.
+                </div>
+              )}
+
+              {candidatesToday.map((c) => {
+                const active = String(currentCandidateId) === String(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => handleCandidateCardClick(c)}
+                    className={`
+                      block rounded-md px-3 py-2 my-2 w-full text-start
+                      border
+                      shadow-[0px_12px_40px_0_rgba(2,6,23,0.3),inset_0_0_120px_rgba(79,70,229,0.08),inset_0px_0px_4px_2px_rgba(255,255,255,0.1)]
+                      backdrop-blur-[16px] backdrop-saturate-[180%]
+                      transition
+                      ${
+                        active
+                          ? "bg-purple-50 dark:bg-purple-900/40 border-purple-200/70 dark:border-purple-500/40 text-slate-900 dark:text-white"
+                          : "bg-slate-50 dark:bg-slate-700 dark:text-white border-[rgba(100,116,139,0.2)] hover:bg-slate-100 dark:hover:bg-slate-600/90"
+                      }
+                    `}
+                    style={{
+                      WebkitBackdropFilter: "blur(16px) saturate(180%)",
+                    }}
+                  >
+                    {/* top row: name + status */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-sm font-semibold truncate">
+                        {getName(c)}
+                      </div>
+
+                      {c.status && (
+                        <span
+                          className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${getStatusBadgeClass(
+                            c.status
+                          )}`}
+                        >
+                          {getStatusLabel(c.status)}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* role */}
+                    <div className="mt-0.5 text-xs text-slate-500 truncate">
+                      {c.role}
+                    </div>
+
+                    {/* date & time */}
+                    {c.start && (
+                      <div className="mt-1 text-[10px] text-slate-500">
+                        {fmtDate(c.start)} • {fmtTime(c.start)}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* JOB ROLES – same info as desktop */}
+          <div className="mt-4 px-1">
+            <div className="pb-2 text-sm text-slate-700 dark:text-slate-300">
               Job Roles
             </div>
-            <CreateNewJobBtn clickFunc={() => onCloseMobile()} />
 
-            {/* ✅ use jobsLoading here, not "loading" */}
+            <CreateNewJobBtn clickFunc={handleCreateNewJobBtn} />
+
             {jobsLoading && (
               <div>
                 <SmallJobCardLoader />
@@ -484,7 +564,7 @@ const getStatusLabel = (status) => {
         <div className="px-2 py-4 border-t border-slate-200 dark:border-slate-700">
           <button
             type="button"
-            onClick={() => localStorage.clear()}
+            onClick={handleLogout}
             className="flex items-center p-3 text-sm font-medium rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 group"
           >
             <RiLogoutCircleRLine className="w-6 h-6 shrink-0 text-slate-500 group-hover:text-slate-700 dark:text-slate-400 dark:group-hover:text-slate-200" />

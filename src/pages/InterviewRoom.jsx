@@ -249,7 +249,19 @@ const styles = `
 .ir-sug-text {
   flex:1;
 }
+.ir-sug-q {
+  font-weight: 600;
+  margin-bottom: 3px;
+}
 
+.ir-sug-a {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+:root:not(.dark) .ir-sug-a {
+  color: #4b5563;
+}
 /* transcript / text */
 .ir-interim {
   color:#cbd5e1;
@@ -733,29 +745,68 @@ useEffect(() => {
     const setStatus = (t) => {
       if (statusEl) statusEl.textContent = t;
     };
- function renderSuggestions(list) {
-      const ul = document.getElementById("suggestions");
-      if (!ul) return;
+function renderSuggestions(list) {
+  const ul = document.getElementById("suggestions");
+  if (!ul) return;
 
-      ul.innerHTML = "";
+  ul.innerHTML = "";
 
-      list.forEach((q, idx) => {
-        const li = document.createElement("li");
-        li.className = "ir-sug-item";
+  list.forEach((item, idx) => {
+    const li = document.createElement("li");
+    li.className = "ir-sug-item";
 
-        const num = document.createElement("span");
-        num.className = "ir-sug-num";
-        num.textContent = String(idx + 1).padStart(2, "0"); // 01, 02, 03...
+    const num = document.createElement("span");
+    num.className = "ir-sug-num";
+    num.textContent = String(idx + 1).padStart(2, "0"); // 01, 02...
 
-        const text = document.createElement("span");
-        text.className = "ir-sug-text";
-        text.textContent = q;
+    const box = document.createElement("div");
+    box.className = "ir-sug-text";
 
-        li.appendChild(num);
-        li.appendChild(text);
-        ul.appendChild(li);
-      });
+    const question =
+      typeof item === "string" ? item : item.question || "";
+
+    const answer =
+      typeof item === "string"
+        ? ""
+        : item.answer || item.expected_answer || "";
+
+    const qEl = document.createElement("div");
+    qEl.className = "ir-sug-q";
+    qEl.textContent = question;
+
+    box.appendChild(qEl);
+
+    if (answer) {
+      const aEl = document.createElement("div");
+      aEl.className = "ir-sug-a";
+      aEl.textContent = answer;
+      box.appendChild(aEl);
     }
+
+    // 💡 When you click a suggestion -> fill Validation panel
+    li.addEventListener("click", () => {
+      if (vQ) vQ.textContent = question || "";
+      if (vE) setBulletList(vE, answer || "");
+
+      dispatch(
+        setValidationData({
+          question: question || "",
+          expectedAnswer: answer || "",
+          verdict: null,
+          score: null,
+          explanation: "",
+          candidateAnswer: "",
+        })
+      );
+    });
+
+    li.appendChild(num);
+    li.appendChild(box);
+    ul.appendChild(li);
+  });
+}
+
+
     function hydrateFromStore() {
       const vState = interviewSession?.validation;
       if (vState) {
@@ -1561,56 +1612,72 @@ useEffect(() => {
   }
 };
 
-     function normalizeQuestionsPayload(data) {
-      let raw = data?.questions ?? data;
-      let list = [];
+ function normalizeQuestionsPayload(data) {
+  // ✅ Preferred: backend returns both questions[] and answers[]
+  if (
+    data &&
+    Array.isArray(data.questions) &&
+    Array.isArray(data.answers) &&
+    data.questions.length === data.answers.length
+  ) {
+    return data.questions.map((q, idx) => ({
+      question: String(q),
+      answer: String(data.answers[idx] ?? ""),
+    }));
+  }
 
-      if (Array.isArray(raw)) {
-        list = raw;
-      } else if (raw && typeof raw === "object" && Array.isArray(raw.questions)) {
-        list = raw.questions;
-      } else if (typeof raw === "string") {
-        let s = raw.trim();
+  // 🔁 Fallbacks (old behaviour if only questions exist)
+  let raw = data?.questions ?? data;
+  let list = [];
 
-        // strip ```json ... ``` fences if present
-        if (s.startsWith("```")) {
-          const firstNewline = s.indexOf("\n");
-          if (firstNewline !== -1) s = s.slice(firstNewline + 1);
-          if (s.endsWith("```")) s = s.slice(0, -3);
-          s = s.trim();
-        }
+  if (Array.isArray(raw)) {
+    list = raw;
+  } else if (raw && typeof raw === "object" && Array.isArray(raw.questions)) {
+    list = raw.questions;
+  } else if (typeof raw === "string") {
+    let s = raw.trim();
 
-        try {
-          const parsed = JSON.parse(s);
-          if (Array.isArray(parsed?.questions)) {
-            list = parsed.questions;
-          } else if (Array.isArray(parsed)) {
-            list = parsed;
-          }
-        } catch {
-          // fallback: split by lines & strip quotes/brackets
-          list = s
-            .split("\n")
-            .map((ln) =>
-              ln
-                .replace(/^["'\s]+/, "")
-                .replace(/["',\s]+$/, "")
-                .trim()
-            )
-            .filter(
-              (ln) =>
-                ln &&
-                !ln.startsWith("{") &&
-                !ln.startsWith("}") &&
-                !ln.startsWith("[") &&
-                !ln.startsWith("]") &&
-                !ln.toLowerCase().startsWith("questions")
-            );
-        }
-      }
-
-      return list.map((q) => String(q));
+    // strip ```json fences if present
+    if (s.startsWith("```")) {
+      const firstNewline = s.indexOf("\n");
+      if (firstNewline !== -1) s = s.slice(firstNewline + 1);
+      if (s.endsWith("```")) s = s.slice(0, -3);
+      s = s.trim();
     }
+
+    try {
+      const parsed = JSON.parse(s);
+      if (Array.isArray(parsed?.questions)) {
+        list = parsed.questions;
+      } else if (Array.isArray(parsed)) {
+        list = parsed;
+      }
+    } catch {
+      // fallback: split by lines
+      list = s
+        .split("\n")
+        .map((ln) =>
+          ln
+            .replace(/^["'\s]+/, "")
+            .replace(/["',\s]+$/, "")
+            .trim()
+        )
+        .filter(
+          (ln) =>
+            ln &&
+            !ln.startsWith("{") &&
+            !ln.startsWith("}") &&
+            !ln.startsWith("[") &&
+            !ln.startsWith("]") &&
+            !ln.toLowerCase().startsWith("questions")
+        );
+    }
+  }
+
+  // fallback → only question text, no answer
+  return list.map((q) => ({ question: String(q), answer: "" }));
+}
+
  async function getQs() {
       await ensureSession();
       try {
